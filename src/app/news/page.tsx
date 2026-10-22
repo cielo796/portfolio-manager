@@ -21,14 +21,14 @@ export default function NewsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+      <div className="flex items-center justify-center min-h-full">
         <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="p-2">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">ニュース</h1>

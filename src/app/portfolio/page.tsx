@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { usePortfolio } from '@/hooks/use-portfolio';
+import { usePageRefresh } from '@/components/shell/refresh-context';
 import { HoldingWithPrice } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { HoldingsTable } from '@/components/holdings-table';
@@ -16,10 +17,14 @@ export default function PortfolioPage() {
     sectorAllocation,
     transactions,
     isLoading,
+    refreshPrices,
+    isRefreshing,
+    exchangeRate,
     updateHolding,
     removeHolding,
     reorderHoldings,
   } = usePortfolio();
+  usePageRefresh(refreshPrices, isRefreshing, exchangeRate.updated_at, !isLoading);
   const [isReorderingHoldings, setIsReorderingHoldings] = useState(false);
   const [selectedHolding, setSelectedHolding] = useState<HoldingWithPrice | null>(null);
 
@@ -55,7 +60,7 @@ export default function PortfolioPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+      <div className="flex items-center justify-center min-h-full">
         <div className="flex flex-col items-center gap-4">
           <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
           <p className="text-slate-400">読み込み中...</p>
@@ -65,7 +70,7 @@ export default function PortfolioPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="p-2">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-100">ポートフォリオ</h1>
         <p className="text-sm text-slate-500 mt-1">保有ポジションの編集・決済ができます。</p>

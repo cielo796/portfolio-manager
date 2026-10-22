@@ -1,15 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0f172a;
-  --foreground: #f1f5f9;
+  --background: #0b0f14;
+  --foreground: #d8dee7;
+  --pm-bg: #0b0f14;
+  --pm-panel: #11161d;
+  --pm-heading: #161c25;
+  --pm-group: #141a22;
+  --pm-border: #232b36;
+  --pm-divider: #1b222c;
+  --pm-input-border: #2c3644;
+  --pm-text: #d8dee7;
+  --pm-muted: #9aa6b6;
+  --pm-link: #7fb3ff;
+  --pm-accent: #f0a33a;
+  --pm-active-bg: #2a2214;
+  --pm-active-text: #f5b955;
+  --pm-selected-row: #1a2638;
+  --pm-up: #ff5c5c;
+  --pm-down: #4ea2ff;
+  --pm-row-h: 24px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), var(--font-noto-sans-jp), sans-serif;
+  --font-mono: ui-monospace, monospace;
 }
 
 /* Tailwind Preflight supplies the reset in its base layer. An unlayered
@@ -18,16 +35,356 @@
 html,
 body {
   max-width: 100vw;
-  overflow-x: hidden;
+  height: 100%;
+  overflow: hidden;
   background: var(--background);
   color: var(--foreground);
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-inter), var(--font-noto-sans-jp), sans-serif;
+  font-size: 12px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pm-shell {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: 40px minmax(0, 1fr) 28px 20px;
+  overflow: hidden;
+}
+
+.pm-workspace {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pm-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px;
+  scrollbar-gutter: stable;
+}
+
+.pm-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 12px;
+  background: var(--pm-heading);
+  border-bottom: 1px solid var(--pm-border);
+}
+
+.pm-brand {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.pm-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--pm-input-border);
+  border-radius: 4px;
+  background: #1d2530;
+  color: var(--pm-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pm-button:hover:not(:disabled) {
+  border-color: var(--pm-accent);
+}
+
+.pm-button:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.pm-shell :focus-visible {
+  outline: 2px solid var(--pm-accent);
+  outline-offset: 2px;
+}
+
+.pm-update-time, .pm-muted {
+  color: var(--pm-muted);
+}
+
+.pm-update-time, .pm-clock, .pm-statusbar {
+  font-variant-numeric: tabular-nums;
+}
+
+.pm-sync-control {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pm-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pm-muted);
+}
+
+.pm-dot.success {
+  background: #2fc677;
+}
+
+.pm-dot.failed {
+  background: var(--pm-accent);
+}
+
+.pm-sync-notice {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pm-muted);
+}
+
+.pm-sync-menu {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  z-index: 60;
+  display: grid;
+  gap: 4px;
+  min-width: 160px;
+  max-width: 280px;
+  max-height: 50vh;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--pm-border);
+  border-radius: 4px;
+  background: var(--pm-panel);
+  box-shadow: 0 8px 20px #0008;
+}
+
+.pm-sync-menu button {
+  justify-content: flex-start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pm-clocks {
+  display: flex;
+  flex-shrink: 0;
+  gap: 12px;
+  margin-left: auto;
+  color: var(--pm-muted);
+  white-space: nowrap;
+}
+
+.pm-clock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pm-clock time {
+  color: var(--pm-text);
+}
+
+.pm-market-state {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--pm-border);
+  font-size: 11px;
+}
+
+.pm-market-state.open {
+  color: #2fc677;
+}
+
+.pm-sidenav {
+  display: flex;
+  flex-direction: column;
+  width: 168px;
+  flex-shrink: 0;
+  min-height: 0;
+  padding: 8px;
+  border-right: 1px solid var(--pm-border);
+  background: var(--pm-panel);
+}
+
+.pm-nav-links {
+  display: grid;
+  gap: 2px;
+}
+
+.pm-nav-links a {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: 4px;
+  color: var(--pm-text);
+}
+
+.pm-nav-links a:hover {
+  background: var(--pm-heading);
+}
+
+.pm-nav-links a[aria-current='page'] {
+  color: var(--pm-active-text);
+  background: var(--pm-active-bg);
+  font-weight: 600;
+}
+
+.pm-lan {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: auto;
+  padding: 8px;
+  background: var(--pm-bg);
+  border: 1px solid var(--pm-border);
+  border-radius: 4px;
+  color: var(--pm-muted);
+  font-size: 11px;
+}
+
+.pm-lan .pm-nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-lan-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pm-text);
+}
+
+.pm-ticker {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--pm-heading);
+  border-block: 1px solid var(--pm-border);
+  scrollbar-width: thin;
+}
+
+.pm-tick {
+  display: flex;
+  flex-shrink: 0;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 12px;
+  border-right: 1px solid var(--pm-border);
+  white-space: nowrap;
+}
+
+.pm-stale {
+  font-size: 10px;
+  color: var(--pm-accent);
+}
+
+.pm-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  overflow: hidden;
+  padding: 0 12px;
+  background: var(--pm-bg);
+  color: var(--pm-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.pm-statusbar span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pm-main table :is(th, td) {
+  height: var(--pm-row-h);
+  padding-block: calc((var(--pm-row-h) - 20px) / 2);
+}
+
+@media (max-width: 899px) {
+  .pm-sidenav {
+    width: 48px;
+    padding: 8px 4px;
+  }
+  .pm-nav-label {
+    display: none;
+  }
+  .pm-nav-links a {
+    padding: 0;
+    justify-content: center;
+  }
+  .pm-lan {
+    align-items: center;
+    padding: 8px 0;
+  }
+  .pm-topbar {
+    padding-inline: 8px;
+    gap: 6px;
+  }
+  .pm-brand {
+    gap: 6px;
+    margin-right: 0;
+    font-size: 12px;
+  }
+  .pm-update-time {
+    display: none;
+  }
+  .pm-sync-notice {
+    font-size: 10px;
+  }
+  .pm-clocks {
+    gap: 8px;
+    font-size: 11px;
+  }
+  .pm-clock {
+    gap: 4px;
+  }
+  .pm-market-state {
+    padding-inline: 3px;
+  }
+}
+
+@media (max-width: 680px) {
+  .pm-brand span, .pm-sync-notice {
+    display: none;
+  }
+  .pm-clocks {
+    gap: 6px;
+    font-size: 10px;
+  }
+  .pm-clock {
+    gap: 2px;
+  }
+  .pm-button {
+    padding-inline: 6px;
+  }
+}
+
 
 /* カスタムスクロールバー */
 ::-webkit-scrollbar {

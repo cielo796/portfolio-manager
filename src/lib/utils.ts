@@ -90,15 +90,15 @@ export const getMarketCurrency = (market: Market, symbol?: string): 'USD' | 'JPY
 
 // 損益の色クラス
 export const getProfitLossColor = (value: number): string => {
-  if (value > 0) return 'text-emerald-400';
-  if (value < 0) return 'text-red-400';
+  if (value > 0) return 'text-[var(--pm-up)]';
+  if (value < 0) return 'text-[var(--pm-down)]';
   return 'text-slate-400';
 };
 
 // 損益の背景色クラス
 export const getProfitLossBgColor = (value: number): string => {
-  if (value > 0) return 'bg-emerald-500/10';
-  if (value < 0) return 'bg-red-500/10';
+  if (value > 0) return 'bg-[color-mix(in_srgb,var(--pm-up)_10%,transparent)]';
+  if (value < 0) return 'bg-[color-mix(in_srgb,var(--pm-down)_10%,transparent)]';
   return 'bg-slate-500/10';
 };
 

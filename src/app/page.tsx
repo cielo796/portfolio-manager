@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { RefreshCw, Plus, Newspaper, ReceiptText } from 'lucide-react';
 import { usePortfolio } from '@/hooks/use-portfolio';
+import { usePageRefresh } from '@/components/shell/refresh-context';
 import { useTickerPresets } from '@/hooks/use-ticker-presets';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,7 @@ export default function Dashboard() {
     removeHolding,
     reorderHoldings,
   } = usePortfolio();
+  usePageRefresh(refreshPrices, isRefreshing, exchangeRate.updated_at, !isLoading);
   const { tickerPresets } = useTickerPresets();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -94,7 +96,7 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+      <div className="flex items-center justify-center min-h-full">
         <div className="flex flex-col items-center gap-4">
           <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
           <p className="text-slate-400">読み込み中...</p>
@@ -104,7 +106,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="p-2">
       {/* ヘッダー */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>

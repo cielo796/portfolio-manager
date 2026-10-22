@@ -2,6 +2,7 @@
 
 import { RefreshCw } from 'lucide-react';
 import { useWatchlist } from '@/hooks/use-watchlist';
+import { usePageRefresh } from '@/components/shell/refresh-context';
 import { Card } from '@/components/ui/card';
 import { AddWatchItemForm } from '@/components/watchlist/add-watch-item-form';
 import { TradeIdeasPanel } from '@/components/watchlist/trade-ideas-panel';
@@ -12,10 +13,11 @@ import { WatchlistTable } from '@/components/watchlist/watchlist-table';
 export default function WatchlistPage() {
   const watchlist = useWatchlist();
   const { isLoading } = watchlist;
+  usePageRefresh(watchlist.refreshWatchPrices, watchlist.isRefreshingPrices, watchlist.lastPriceUpdatedAt, !isLoading);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+      <div className="flex items-center justify-center min-h-full">
         <div className="flex flex-col items-center gap-4">
           <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
           <p className="text-slate-400">読み込み中...</p>
@@ -25,7 +27,7 @@ export default function WatchlistPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="p-2">
       <WatchlistHeader {...watchlist} />
 
       <div className="flex flex-col gap-6">

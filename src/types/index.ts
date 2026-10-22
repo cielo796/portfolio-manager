@@ -215,6 +215,39 @@ export interface ApiResponse<T> {
   success: boolean;
 }
 
+export interface DisplaySettings {
+  updown: 'jp' | 'us';
+  density: 'compact' | 'standard';
+}
+
+export interface MarketItem {
+  key: string;
+  name: string;
+  value: number;
+  change: number;
+  changePercent: number;
+  updatedAt: string;
+}
+
+export interface MarketSnapshot {
+  items: MarketItem[];
+  fetchedAt: string;
+  failed: string[];
+  dbFile: string;
+}
+
+export type ShellSyncPeer = Pick<SyncPeer, 'id' | 'device_id' | 'name' | 'last_synced_at'>;
+
+export interface ShellSyncLog {
+  peer_device_id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: 'running' | 'success' | 'failed';
+  received: number;
+  sent: number;
+  conflicts: number;
+}
+
 // LAN同期ではDBの全列をそのまま交換する
 export type SyncTable = 'portfolios' | 'holdings' | 'transactions' | 'trade_ideas' | 'ticker_presets' | 'watchlist_items';
 export type SyncValue = string | number | null;
