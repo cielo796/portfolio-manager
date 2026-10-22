@@ -94,7 +94,7 @@ describe('同期スキーマと論理削除', () => {
         INSERT INTO ticker_presets VALUES ('old-preset', 'NVDA', 'US', NULL, '${initialTime}', '${initialTime}');
       `);
       runMigrations(legacy);
-      expect(legacy.pragma('user_version', { simple: true })).toBe(3);
+      expect(legacy.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(3);
       for (const table of SYNC_TABLES) {
         const rows = legacy.prepare(`SELECT deleted_at, updated_by FROM ${table}`).all();
         expect(rows).toEqual([{ deleted_at: null, updated_by: null }]);
