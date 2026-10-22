@@ -158,7 +158,7 @@ export const WatchlistTable = (props: WatchlistTableProps) => {
                 <div className="min-w-0 lg:text-right" title={price?.updated_at ? `株価更新: ${formatDate(price.updated_at, 'full')}` : '株価は未更新です'}>
                   <div className="mb-1 text-xs text-slate-400">現在値</div>
                   <div className="whitespace-nowrap text-base font-semibold tabular-nums text-slate-100">{currentPrice == null ? '—' : formatCurrency(currentPrice, currency)}</div>
-                  {price && <div className={`mt-0.5 text-xs tabular-nums ${price.change_percent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPercent(price.change_percent)}<span className="ml-1 text-[10px] text-slate-400">前日比</span></div>}
+                  {price && <div className={`mt-0.5 text-xs tabular-nums ${price.change_percent >= 0 ? 'text-[var(--pm-up)]' : 'text-[var(--pm-down)]'}`}>{formatPercent(price.change_percent)}<span className="ml-1 text-[10px] text-slate-400">前日比</span></div>}
                 </div>
                 <div className="min-w-0 lg:text-right">
                   <div className="mb-1 text-xs text-slate-400">目標価格</div>
@@ -166,7 +166,7 @@ export const WatchlistTable = (props: WatchlistTableProps) => {
                 </div>
                 <div className="min-w-0 lg:text-right">
                   <div className="mb-1 text-xs text-slate-400" title="（目標価格 ÷ 現在値 − 1）× 100">目標まで</div>
-                  <div className={`whitespace-nowrap text-sm font-medium tabular-nums ${gap === undefined ? 'text-slate-400' : gap >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{gap === undefined ? '—' : formatPercent(gap)}</div>
+                  <div className={`whitespace-nowrap text-sm font-medium tabular-nums ${gap === undefined ? 'text-slate-400' : gap >= 0 ? 'text-[var(--pm-up)]' : 'text-[var(--pm-down)]'}`}>{gap === undefined ? '—' : formatPercent(gap)}</div>
                 </div>
                 <div className="min-w-0">
                   <div className="mb-1 text-xs text-slate-400">メモ</div>
@@ -176,7 +176,7 @@ export const WatchlistTable = (props: WatchlistTableProps) => {
                   <Button type="button" size="sm" variant="ghost" className="h-9 w-9" aria-label={`${item.symbol}を編集`} title="編集" onClick={() => startEdit(item)} disabled={isSavingEdit}>
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button type="button" size="sm" variant="ghost" className="h-9 w-9 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400" aria-label={`${item.symbol}を削除`} title="削除" onClick={() => handleDelete(item.id)} disabled={isSavingEdit}>
+                  <Button type="button" size="sm" variant="ghost" className="h-9 w-9 text-slate-400 hover:bg-rose-500/10 hover:text-[var(--pm-down)]" aria-label={`${item.symbol}を削除`} title="削除" onClick={() => handleDelete(item.id)} disabled={isSavingEdit}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

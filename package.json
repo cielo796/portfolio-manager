@@ -15,6 +15,7 @@
     "desktop:start": "node electron/desktop-runner.mjs start"
   },
   "dependencies": {
+    "@tanstack/react-table": "^8.21.3",
     "better-sqlite3": "^12.6.2",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.563.0",

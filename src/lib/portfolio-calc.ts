@@ -153,6 +153,15 @@ export function computeSectorAllocation(holdings: HoldingWithPrice[], total: num
   }));
 }
 
+export function computeHoldingSubtotal(holdings: HoldingWithPrice[], usdJpy: number, portfolioTotal: number) {
+  const summary = computeSummary(holdings, usdJpy);
+  return {
+    ...summary,
+    count: holdings.length,
+    weight: portfolioTotal > 0 ? summary.total_value_jpy / portfolioTotal * 100 : 0,
+  };
+}
+
 export function computeHoldingAllocation(holdings: HoldingWithPrice[], total: number): HoldingAllocation[] {
   return Array.from(
     holdings.reduce((acc, holding) => {

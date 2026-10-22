@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Holding, StockPrice } from '@/types';
 import {
+  computeHoldingSubtotal,
   computeHoldingsWithPrices,
   computeSummary,
   computeSectorAllocation,
@@ -201,5 +202,39 @@ describe('配分計算', () => {
     expect(allocation[1]).toMatchObject({ symbol: 'AAPL', market: 'JP', value: 100 });
     expect(allocation.reduce((sum, item) => sum + item.percent, 0)).toBeCloseTo(100);
     expect(computeHoldingAllocation(result, 0).every((item) => item.percent === 0)).toBe(true);
+  });
+});
+
+describe('computeHoldingSubtotal', () => {
+  it('グループ評価額・損益率・構成比を集計し未取得を損益から除外する', () => {
+    const rows = computeHoldingsWithPrices([
+      holding(),
+      holding({ id: 'cash', symbol: 'CASH', market: 'JP', shares: 20000 }),
+      holding({ id: 'missing', symbol: 'MISSING', market: 'JP', shares: 10, avg_cost: 100 }),
+    ], priceMap(quote()), usdJpy);
+    expect(computeHoldingSubtotal(rows, usdJpy, 402000)).toMatchObject({
+      count: 3, total_value_jpy: 201000, total_cost_jpy: 170000,
+      total_profit_loss: 30000, daily_change: 3600, missing_price_count: 1, weight: 50,
+    });
+    expect(computeHoldingSubtotal(rows, usdJpy, 402000).total_profit_loss_percent).toBeCloseTo(30000 / 170000 * 100);
+  });
+
+  it('空のグループと全価格未取得でも非有限値を返さない', () => {
+    expect(computeHoldingSubtotal([], usdJpy, 0)).toMatchObject({ count: 0, weight: 0, total_profit_loss_percent: 0 });
+    const rows = computeHoldingsWithPrices([holding()], {}, usdJpy);
+    expect(computeHoldingSubtotal(rows, usdJpy, 150000)).toMatchObject({
+      count: 1, weight: 100, total_value_jpy: 150000, total_profit_loss: 0, total_profit_loss_percent: 0, daily_change: 0,
+    });
+  });
+
+  it('USDクォートFXとJPYクォートFXの小計を円で計算する', () => {
+    const rows = computeHoldingsWithPrices([
+      holding({ symbol: 'EURUSD', market: 'FX', shares: 1000, avg_cost: 1.1 }),
+      holding({ symbol: 'USDJPY', market: 'FX', shares: 1000, avg_cost: 140 }),
+    ], priceMap(quote({ symbol: 'EURUSD', market: 'FX', price: 1.2 }), quote({ symbol: 'USDJPY', market: 'FX', price: 150 })), usdJpy);
+    expect(computeHoldingSubtotal(rows, usdJpy, 660000)).toMatchObject({
+      count: 2, total_value_jpy: 330000, total_cost_jpy: 305000, weight: 50,
+    });
+    expect(computeHoldingSubtotal(rows, usdJpy, 660000).total_profit_loss).toBeCloseTo(25000);
   });
 });
