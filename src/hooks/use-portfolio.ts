@@ -34,6 +34,8 @@ export const usePortfolio = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRefreshingNews, setIsRefreshingNews] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [priceError, setPriceError] = useState(false);
 
   const refreshNews = useCallback(async () => {
     setIsRefreshingNews(true);
@@ -54,6 +56,7 @@ export const usePortfolio = () => {
 
   const loadPortfolioData = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(false);
     try {
       const response = await fetch('/api/portfolio-data', { cache: 'no-store' });
       if (!response.ok) {
@@ -86,6 +89,7 @@ export const usePortfolio = () => {
         setExchangeRate(mockExchangeRate);
       }
     } catch {
+      setLoadError(true);
       // API未起動時などのフォールバック
       setPortfolios(mockPortfolios);
       setHoldings(mockHoldings);
@@ -106,6 +110,7 @@ export const usePortfolio = () => {
   // 株価更新
   const refreshPrices = useCallback(async () => {
     setIsRefreshing(true);
+    setPriceError(false);
     try {
       const symbols = holdings
         .filter((holding) => holding.symbol !== 'CASH')
@@ -133,7 +138,7 @@ export const usePortfolio = () => {
         },
         body: JSON.stringify({ symbols }),
       });
-      if (!response.ok) return;
+      if (!response.ok) { setPriceError(true); return; }
 
       const data = (await response.json()) as {
         prices?: Record<string, StockPrice>;
@@ -157,6 +162,9 @@ export const usePortfolio = () => {
           updated_at: usdJpyPrice?.updated_at ?? data.updatedAt ?? new Date().toISOString(),
         }));
       }
+    } catch (error) {
+      setPriceError(true);
+      throw error;
     } finally {
       setIsRefreshing(false);
     }
@@ -301,6 +309,9 @@ export const usePortfolio = () => {
     isLoading,
     isRefreshing,
     isRefreshingNews,
+    loadError,
+    priceError,
+    reloadPortfolioData: loadPortfolioData,
     refreshPrices,
     refreshNews,
     addHolding,

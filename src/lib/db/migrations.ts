@@ -15,7 +15,17 @@ const MIGRATIONS: Array<{
   { version: 2, name: 'normalize-holding-sectors', up: normalizeHoldingSectors },
   { version: 3, name: 'sync-schema', up: createSyncSchema },
   { version: 4, name: 'price-history-cache', up: createPriceHistory },
+  { version: 5, name: 'fundamentals-cache', up: createFundamentalsCache },
 ];
+
+function createFundamentalsCache(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS fundamentals_cache (
+      symbol TEXT NOT NULL, market TEXT NOT NULL, data_json TEXT NOT NULL,
+      fetched_at TEXT NOT NULL, PRIMARY KEY (symbol, market)
+    );
+  `);
+}
 
 function createPriceHistory(db: Database.Database) {
   db.exec(`

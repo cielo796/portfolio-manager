@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { FundamentalMetrics, Market } from '@/types';
+import { readFundamentalsCache, writeFundamentalsCache } from '@/lib/db/fundamentals-cache';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -11,6 +12,7 @@ type FundamentalSymbolRequest = {
 
 type FundamentalsRequest = {
   symbols?: FundamentalSymbolRequest[];
+  refresh?: boolean;
 };
 
 type YahooFundamentalPoint = {
@@ -224,7 +226,7 @@ const fetchNasdaqEarningsOnDate = async (symbol: string, date: string) => {
   }
 };
 
-const findNextNasdaqEarningsDate = async (symbol: string, latestQuarterEnd?: Date) => {
+const findNextNasdaqEarningsDate = async (symbol: string, latestQuarterEnd?: Date, refresh = false) => {
   if (!latestQuarterEnd) return undefined;
 
   const nextQuarterEnd = addMonths(latestQuarterEnd, 3);
@@ -233,7 +235,7 @@ const findNextNasdaqEarningsDate = async (symbol: string, latestQuarterEnd?: Dat
   const cacheKey = `${normalizeSymbol(symbol)}|${toDateOnly(candidate)}|${searchWindowDays}`;
   const cache = getEarningsDateCache();
   const cached = cache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (!refresh && cached && cached.expiresAt > Date.now()) {
     return cached.value;
   }
 
@@ -266,7 +268,7 @@ const findNextNasdaqEarningsDate = async (symbol: string, latestQuarterEnd?: Dat
   return undefined;
 };
 
-const fetchYahooFundamentals = async (symbol: string, market: Market): Promise<FundamentalMetrics | null> => {
+const fetchYahooFundamentals = async (symbol: string, market: Market, refresh = false): Promise<FundamentalMetrics | null> => {
   if (market === 'FX' || normalizeSymbol(symbol) === 'CASH') return null;
 
   const yahooSymbol = toYahooSymbol(symbol, market);
@@ -303,7 +305,7 @@ const fetchYahooFundamentals = async (symbol: string, market: Market): Promise<F
     const shareBuyback = latestValue(getSeries(data, 'trailingRepurchaseOfCapitalStock'));
     const latestQuarterEnd = getLatestQuarterEnd(data);
     const nextEarningsDate =
-      market === 'US' ? await findNextNasdaqEarningsDate(normalizeSymbol(symbol), latestQuarterEnd) : undefined;
+      market === 'US' ? await findNextNasdaqEarningsDate(normalizeSymbol(symbol), latestQuarterEnd, refresh) : undefined;
 
     return {
       symbol: normalizeSymbol(symbol),
@@ -371,7 +373,10 @@ export async function POST(request: Request) {
 
   const entries = await Promise.all(
     Array.from(unique.values()).map(async (item) => {
-      const metrics = await fetchYahooFundamentals(item.symbol, item.market);
+      const cached = body.refresh === true ? undefined : readFundamentalsCache(item.symbol, item.market);
+      if (cached) return [metricKey(item.symbol, item.market), cached] as const;
+      const metrics = await fetchYahooFundamentals(item.symbol, item.market, body.refresh === true);
+      if (metrics) writeFundamentalsCache(metrics);
       return metrics ? ([metricKey(item.symbol, item.market), metrics] as const) : null;
     })
   );
