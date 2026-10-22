@@ -3,27 +3,30 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import type { ColumnSizingState, OnChangeFn, VisibilityState } from '@tanstack/react-table';
 
-const STORAGE_KEY = 'pm.columns.holdings';
-const EVENT = 'pm-columns-holdings-change';
-const DEFAULT_VISIBILITY: VisibilityState = { account: false, memo: false, updated: false };
+type ColumnScope = 'holdings' | 'watchlist';
+const DEFAULT_VISIBILITY: Record<ColumnScope, VisibilityState> = {
+  holdings: { account: false, memo: false, updated: false },
+  watchlist: {},
+};
 type ColumnSettings = { visibility: VisibilityState; sizing: ColumnSizingState };
-let memory: string | null = null;
+const memory: Partial<Record<ColumnScope, string | null>> = {};
 
-function read() {
-  if (memory !== null) return memory;
-  try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
+function read(scope: ColumnScope) {
+  if (memory[scope] != null) return memory[scope];
+  try { return localStorage.getItem(`pm.columns.${scope}`); } catch { return null; }
 }
 
-function parse(raw: string | null): ColumnSettings {
-  const defaults = { visibility: DEFAULT_VISIBILITY, sizing: {} };
+function parse(raw: string | null, scope: ColumnScope): ColumnSettings {
+  const defaultVisibility = DEFAULT_VISIBILITY[scope];
+  const defaults = { visibility: defaultVisibility, sizing: {} };
   try {
     const saved = JSON.parse(raw ?? 'null');
     if (!saved || typeof saved !== 'object') return defaults;
     return {
       visibility: saved.visibility && typeof saved.visibility === 'object'
-        ? { ...DEFAULT_VISIBILITY, ...Object.fromEntries(Object.entries(saved.visibility).filter(
+        ? { ...defaultVisibility, ...Object.fromEntries(Object.entries(saved.visibility).filter(
           (entry): entry is [string, boolean] => typeof entry[1] === 'boolean'
-        )) } : DEFAULT_VISIBILITY,
+        )) } : defaultVisibility,
       sizing: saved.sizing && typeof saved.sizing === 'object'
         ? Object.fromEntries(Object.entries(saved.sizing).filter(
           (entry): entry is [string, number] => typeof entry[1] === 'number'
@@ -33,36 +36,41 @@ function parse(raw: string | null): ColumnSettings {
   } catch { return defaults; }
 }
 
-function subscribe(callback: () => void) {
+function subscribe(scope: ColumnScope, callback: () => void) {
   const onStorage = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEY || event.key === null) { memory = null; callback(); }
+    if (event.key === `pm.columns.${scope}` || event.key === null) { memory[scope] = null; callback(); }
   };
   window.addEventListener('storage', onStorage);
-  window.addEventListener(EVENT, callback);
+  window.addEventListener(`pm-columns-${scope}-change`, callback);
   return () => {
     window.removeEventListener('storage', onStorage);
-    window.removeEventListener(EVENT, callback);
+    window.removeEventListener(`pm-columns-${scope}-change`, callback);
   };
 }
 
-function write(settings: ColumnSettings) {
-  memory = JSON.stringify(settings);
-  try { localStorage.setItem(STORAGE_KEY, memory); } catch {
+function write(scope: ColumnScope, settings: ColumnSettings) {
+  const raw = JSON.stringify(settings);
+  memory[scope] = raw;
+  try { localStorage.setItem(`pm.columns.${scope}`, raw); } catch {
     // ストレージが無効でも現在のタブには反映する。
   }
-  window.dispatchEvent(new Event(EVENT));
+  window.dispatchEvent(new Event(`pm-columns-${scope}-change`));
 }
 
-export function useColumnSettings() {
-  const raw = useSyncExternalStore(subscribe, read, () => null);
-  const settings = useMemo(() => parse(raw), [raw]);
+export function useColumnSettings(scope: ColumnScope = 'holdings') {
+  const store = useMemo(() => ({
+    subscribe: (callback: () => void) => subscribe(scope, callback),
+    read: () => read(scope),
+  }), [scope]);
+  const raw = useSyncExternalStore(store.subscribe, store.read, () => null);
+  const settings = useMemo(() => parse(raw, scope), [raw, scope]);
   const setVisibility: OnChangeFn<VisibilityState> = (updater) => {
-    const current = parse(read());
-    write({ ...current, visibility: typeof updater === 'function' ? updater(current.visibility) : updater });
+    const current = parse(read(scope), scope);
+    write(scope, { ...current, visibility: typeof updater === 'function' ? updater(current.visibility) : updater });
   };
   const setSizing: OnChangeFn<ColumnSizingState> = (updater) => {
-    const current = parse(read());
-    write({ ...current, sizing: typeof updater === 'function' ? updater(current.sizing) : updater });
+    const current = parse(read(scope), scope);
+    write(scope, { ...current, sizing: typeof updater === 'function' ? updater(current.sizing) : updater });
   };
   return { ...settings, setVisibility, setSizing };
 }

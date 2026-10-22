@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { priceKey } from '@/lib/price-key';
 import { usePortfolio } from '@/hooks/use-portfolio';
 import { useTickerPresets } from '@/hooks/use-ticker-presets';
-import { FundamentalMetrics, Market, StockPrice, TradeIdea, WatchlistItem, WatchlistKey } from '@/types';
+import { FundamentalMetrics, Market, SparklineItem, StockPrice, TradeIdea, WatchlistItem, WatchlistKey } from '@/types';
 import { SECTORS, SectorKey, getSectorOrder, normalizeSectorKey, resolveSectorForSymbol } from '@/lib/sectors';
 import { WATCHLIST_TABS } from '@/components/watchlist/constants';
 import { getMarketLabel } from '@/components/watchlist/format';
@@ -55,6 +55,8 @@ export const useWatchlist = () => {
   const [tradeIdeas, setTradeIdeas] = useState<TradeIdea[]>([]);
   const [priceMap, setPriceMap] = useState<Record<string, StockPrice>>({});
   const [fundamentalMap, setFundamentalMap] = useState<Record<string, FundamentalMetrics>>({});
+  const [sparklineMap, setSparklineMap] = useState<Record<string, SparklineItem>>({});
+  const [metricsError, setMetricsError] = useState('');
   const [lastPriceUpdatedAt, setLastPriceUpdatedAt] = useState<string | null>(null);
   const [activeListKey, setActiveListKey] = useState<WatchlistKey>('main');
   const [isLoadingItems, setIsLoadingItems] = useState(true);
@@ -72,8 +74,6 @@ export const useWatchlist = () => {
   const [sectorFilter, setSectorFilter] = useState<SectorKey | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showIdeas, setShowIdeas] = useState(false);
-  const [expandedFundamentalIds, setExpandedFundamentalIds] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCompanyName, setEditCompanyName] = useState('');
   const [editSector, setEditSector] = useState<SectorKey>('other');
@@ -89,6 +89,50 @@ export const useWatchlist = () => {
   const [editIdeaSymbol, setEditIdeaSymbol] = useState('');
   const [editIdeaNote, setEditIdeaNote] = useState('');
   const [isSavingIdeaEdit, setIsSavingIdeaEdit] = useState(false);
+
+  const metricSymbols = useMemo(() => JSON.stringify(Array.from(new Map(watchlistItems.map((item) => [
+    priceKey(item.symbol, item.market), { symbol: item.symbol, market: item.market },
+  ])).values())), [watchlistItems]);
+
+  const loadMetrics = useCallback(async (symbols: Array<{ symbol: string; market: Market }>, signal?: AbortSignal, refresh = false) => {
+    const requests: Promise<void>[] = [
+      (async () => {
+        const response = await fetch('/api/fundamentals', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbols, refresh }), signal,
+        });
+        if (!response.ok) throw new Error('fundamentals');
+        const data = await response.json() as { fundamentals?: Record<string, FundamentalMetrics> };
+        if (!signal?.aborted) setFundamentalMap((previous) => ({ ...previous, ...data.fundamentals }));
+      })(),
+    ];
+    // スパークラインAPIの上限に合わせ、100銘柄ずつ取得する。
+    for (let index = 0; index < symbols.length; index += 100) {
+      requests.push((async () => {
+        const response = await fetch('/api/sparklines', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: symbols.slice(index, index + 100), days: 5 }), signal,
+        });
+        if (!response.ok) throw new Error('sparklines');
+        const data = await response.json() as { items: SparklineItem[] };
+        if (!signal?.aborted) setSparklineMap((previous) => ({
+          ...previous, ...Object.fromEntries(data.items.filter((item) => item.market !== 'INDEX')
+            .map((item) => [`${item.symbol}|${item.market}`, item])),
+        }));
+      })());
+    }
+    const results = await Promise.allSettled(requests);
+    if (!signal?.aborted) setMetricsError(results.some((result) => result.status === 'rejected')
+      ? '指標・チャートの一部を取得できませんでした。更新ボタンで再試行できます。' : '');
+  }, []);
+
+  useEffect(() => {
+    const symbols = JSON.parse(metricSymbols) as Array<{ symbol: string; market: Market }>;
+    if (symbols.length === 0) return;
+    const controller = new AbortController();
+    void loadMetrics(symbols, controller.signal);
+    return () => controller.abort();
+  }, [metricSymbols, loadMetrics]);
 
   const symbolOptions = useMemo<SymbolOption[]>(() => {
     const unique = new Map<string, SymbolOption>();
@@ -294,16 +338,9 @@ export const useWatchlist = () => {
         },
         body: JSON.stringify({ symbols }),
       });
-      const fundamentalsRequest = fetch('/api/fundamentals', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ symbols }),
-      });
-      const [priceResponse, fundamentalsResponse] = await Promise.all([
+      const [priceResponse] = await Promise.all([
         priceRequest,
-        fundamentalsRequest,
+        loadMetrics(symbols, undefined, true),
       ]);
       if (!priceResponse.ok) throw new Error('failed_to_refresh_prices');
 
@@ -317,13 +354,6 @@ export const useWatchlist = () => {
         ...nextPrices,
       }));
       setLastPriceUpdatedAt(data.updatedAt ?? getLatestPriceUpdatedAt(nextPrices) ?? new Date().toISOString());
-
-      if (fundamentalsResponse.ok) {
-        const fundamentalsData = (await fundamentalsResponse.json()) as {
-          fundamentals?: Record<string, FundamentalMetrics>;
-        };
-        setFundamentalMap(fundamentalsData.fundamentals ?? {});
-      }
     } catch {
       alert('株価情報の更新に失敗しました。');
     } finally {
@@ -436,7 +466,7 @@ export const useWatchlist = () => {
   };
 
   const reorderWithinActiveList = (targetId: string | null) => {
-    if (!draggedId || isSavingLayout) return;
+    if (!draggedId || isSavingLayout || targetId === draggedId) return;
     const dragged = watchlistItems.find((item) => item.id === draggedId);
     if (!dragged) return;
 
@@ -671,8 +701,6 @@ export const useWatchlist = () => {
     refreshWatchPrices,
     isRefreshingPrices,
     watchlistItems,
-    setShowIdeas,
-    showIdeas,
     tradeIdeas,
     activeListKey,
     setActiveListKey,
@@ -712,6 +740,8 @@ export const useWatchlist = () => {
     sectorGroups,
     priceMap,
     fundamentalMap,
+    sparklineMap,
+    metricsError,
     editingId,
     dragOverId,
     setDragOverId,
@@ -728,8 +758,6 @@ export const useWatchlist = () => {
     setEditTargetPrice,
     editMemo,
     setEditMemo,
-    expandedFundamentalIds,
-    setExpandedFundamentalIds,
     handleSubmitIdea,
     ideaSymbol,
     setIdeaSymbol,

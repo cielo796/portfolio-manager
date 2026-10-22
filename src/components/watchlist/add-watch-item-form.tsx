@@ -4,7 +4,6 @@ import type { WatchlistState } from '@/hooks/use-watchlist';
 import { Plus } from 'lucide-react';
 import { Market } from '@/types';
 import { SectorKey, resolveSectorForSymbol } from '@/lib/sectors';
-import { CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { MARKET_OPTIONS, SECTOR_OPTIONS } from './constants';
@@ -54,7 +53,7 @@ export const AddWatchItemForm = ({
 }: AddWatchItemFormProps) => {
   return (
     <>
-    {showAddForm && <CardContent>
+    {showAddForm && <div className="border-t border-[var(--pm-border)] p-2">
       <form id="watchlist-add-form" onSubmit={handleAddWatchItem} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
         <div className="lg:col-span-3">
           <Select
@@ -144,7 +143,7 @@ export const AddWatchItemForm = ({
           </Button>
         </div>
       </form>
-    </CardContent>}
+    </div>}
     </>
   );
 };

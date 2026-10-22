@@ -1,111 +1,33 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { WatchlistState } from '@/hooks/use-watchlist';
-import { Eye, Layers, Search } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { SECTORS } from '@/lib/sectors';
-import { CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { WATCHLIST_TABS } from './constants';
 
 type WatchlistToolbarProps = Pick<WatchlistState,
-  | 'activeListKey'
-  | 'visibleItemCount'
-  | 'activeItems'
-  | 'sortActiveListBySector'
-  | 'isSavingLayout'
->;
+  'searchQuery' | 'setSearchQuery' | 'sectorFilter' | 'setSectorFilter' | 'sectorCounts' | 'activeItems'
+  | 'sortActiveListBySector' | 'isSavingLayout' | 'isRefreshingPrices' | 'refreshWatchPrices'
+  | 'showAddForm' | 'setShowAddForm' | 'watchlistItems' | 'visibleItemCount'
+> & { columnsMenu: ReactNode };
 
-export const WatchlistToolbar = ({
-  activeListKey,
-  visibleItemCount,
-  activeItems,
-  sortActiveListBySector,
-  isSavingLayout,
-}: WatchlistToolbarProps) => {
-  return (
-    <CardHeader className="flex flex-wrap items-center justify-between gap-4">
-      <div className="flex items-center gap-2">
-        <Eye className="w-5 h-5 text-blue-400" />
-        <CardTitle>{WATCHLIST_TABS.find((tab) => tab.key === activeListKey)?.label}の銘柄</CardTitle>
-        <span className="text-sm tabular-nums text-slate-400">{visibleItemCount} / {activeItems.length}</span>
-      </div>
-      <div className="flex items-center gap-3">
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          onClick={sortActiveListBySector}
-          disabled={isSavingLayout || activeItems.length === 0}
-        >
-          <Layers className="w-4 h-4" />
-          セクター順に整列
-        </Button>
-        <span className="hidden text-xs text-slate-400 xl:inline">
-          {isSavingLayout ? '並び順を保存中...' : 'ドラッグで並び替え'}
-        </span>
-      </div>
-    </CardHeader>
-  );
-};
-
-type WatchlistFiltersProps = Pick<WatchlistState,
-  | 'searchQuery'
-  | 'setSearchQuery'
-  | 'sectorFilter'
-  | 'setSectorFilter'
-  | 'activeItems'
-  | 'sectorCounts'
->;
-
-export const WatchlistFilters = ({
-  searchQuery,
-  setSearchQuery,
-  sectorFilter,
-  setSectorFilter,
-  activeItems,
-  sectorCounts,
-}: WatchlistFiltersProps) => {
-  return (
-    <>
-    <div className="relative mb-4 max-w-md">
-      <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
-      <input type="search" aria-label="銘柄を検索" placeholder="銘柄コード・会社名・メモで検索" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="h-10 w-full rounded-lg border border-slate-600/60 bg-slate-900/50 pr-3 pl-10 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+export function WatchlistToolbar(props: WatchlistToolbarProps) {
+  return <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5">
+    <div className="flex flex-wrap items-center gap-1" aria-label="セクターフィルタ">
+      {[{ key: 'all' as const, label: 'すべて' }, ...SECTORS.filter((sector) => (props.sectorCounts.get(sector.key) ?? 0) > 0)].map((sector) => (
+        <button key={sector.key} type="button" aria-pressed={props.sectorFilter === sector.key} onClick={() => props.setSectorFilter(sector.key)}
+          className={`h-[22px] rounded-full border px-2 text-[11px] ${props.sectorFilter === sector.key ? 'border-[#6b5226] bg-[var(--pm-active-bg)] text-[var(--pm-active-text)]' : 'border-[var(--pm-input-border)] bg-[var(--pm-heading)] pm-muted'}`}>
+          {sector.label} <span className="tabular-nums">{sector.key === 'all' ? props.activeItems.length : props.sectorCounts.get(sector.key)}</span>
+        </button>
+      ))}
     </div>
-    <div className="mb-4 flex flex-wrap gap-2">
-      <button
-        type="button"
-        aria-pressed={sectorFilter === 'all'}
-        onClick={() => setSectorFilter('all')}
-        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-          sectorFilter === 'all'
-            ? 'border-blue-500/60 bg-blue-500/15 text-blue-200'
-            : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-500'
-        }`}
-      >
-        すべて
-        <span className="ml-1.5 text-slate-400">{activeItems.length}</span>
-      </button>
-      {SECTORS.filter((definition) => (sectorCounts.get(definition.key) ?? 0) > 0).map(
-        (definition) => (
-          <button
-            key={definition.key}
-            type="button"
-            aria-pressed={sectorFilter === definition.key}
-            onClick={() => setSectorFilter(definition.key)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-              sectorFilter === definition.key
-                ? definition.badgeClass
-                : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-500'
-            }`}
-          >
-            {definition.label}
-            <span className="ml-1.5 text-slate-400">
-              {sectorCounts.get(definition.key) ?? 0}
-            </span>
-          </button>
-        )
-      )}
-    </div>
-    </>
-  );
-};
+    <input type="search" aria-label="銘柄を検索" placeholder="コード・銘柄名・メモで検索" value={props.searchQuery} onChange={(event) => props.setSearchQuery(event.target.value)} className="ml-auto h-[26px] min-w-40 flex-1 rounded border border-[var(--pm-input-border)] bg-[var(--pm-bg)] px-2 min-[1400px]:max-w-56" />
+    <button type="button" className="pm-button" onClick={props.sortActiveListBySector} disabled={props.isSavingLayout || props.activeItems.length === 0}>{props.isSavingLayout ? '保存中…' : 'セクター順に整列'}</button>
+    {props.columnsMenu}
+    <button type="button" className="pm-button inline-flex items-center gap-1" onClick={props.refreshWatchPrices} disabled={props.isRefreshingPrices || props.watchlistItems.length === 0}>
+      <RefreshCw className={`h-3 w-3 ${props.isRefreshingPrices ? 'animate-spin' : ''}`} />{props.isRefreshingPrices ? '更新中…' : '価格・指標を更新'}
+    </button>
+    <button type="button" className="pm-button !border-[var(--pm-accent)] !bg-[var(--pm-accent)] !text-[#1a1205]" onClick={() => props.setShowAddForm(!props.showAddForm)} aria-expanded={props.showAddForm} aria-controls="watchlist-add-form">{props.showAddForm ? '閉じる' : '＋ 銘柄を追加'}</button>
+    <span className="text-[11px] pm-muted">{props.visibleItemCount}/{props.activeItems.length}銘柄</span>
+  </div>;
+}

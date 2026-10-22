@@ -42,12 +42,14 @@ type YahooChartResponse = {
     result?: Array<{
       meta?: {
         regularMarketPrice?: number;
+        regularMarketVolume?: number;
         chartPreviousClose?: number;
         currency?: string;
       };
       indicators?: {
         quote?: Array<{
           close?: Array<number | null>;
+          volume?: Array<number | null>;
         }>;
       };
     }>;
@@ -58,6 +60,7 @@ type YahooChartResponse = {
 type YahooQuote = {
   close: number;
   previousClose?: number;
+  volume?: number;
 };
 
 const isPositiveFiniteNumber = (value: unknown): value is number =>
@@ -84,6 +87,8 @@ const parseYahooChart = (data: YahooChartResponse): YahooQuote | null => {
   return {
     close,
     previousClose,
+    volume: [result.meta?.regularMarketVolume, ...(result.indicators?.quote?.[0]?.volume ?? []).slice().reverse()]
+      .find((value): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0),
   };
 };
 
@@ -160,6 +165,7 @@ export async function POST(request: Request) {
         price: Number(quote.close.toFixed(6)),
         change: Number(change.toFixed(6)),
         change_percent: Number(changePercent.toFixed(4)),
+        volume: quote.volume ?? null,
         currency,
         updated_at: now,
       };

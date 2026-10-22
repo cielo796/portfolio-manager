@@ -100,6 +100,7 @@ export interface StockPrice {
   price: number;
   change: number;
   change_percent: number;
+  volume?: number | null;
   currency: string;
   updated_at: string;
 }

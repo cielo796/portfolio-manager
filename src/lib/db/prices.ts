@@ -26,13 +26,14 @@ export function upsertStockPrices(prices: StockPrice[]) {
 
   const db = getDb();
   const insert = db.prepare(`
-    INSERT INTO stock_prices (symbol, market, name, price, change, change_percent, currency, updated_at)
-    VALUES (@symbol, @market, @name, @price, @change, @change_percent, @currency, @updated_at)
+    INSERT INTO stock_prices (symbol, market, name, price, change, change_percent, volume, currency, updated_at)
+    VALUES (@symbol, @market, @name, @price, @change, @change_percent, @volume, @currency, @updated_at)
     ON CONFLICT(symbol, market) DO UPDATE SET
       name = excluded.name,
       price = excluded.price,
       change = excluded.change,
       change_percent = excluded.change_percent,
+      volume = excluded.volume,
       currency = excluded.currency,
       updated_at = excluded.updated_at
   `);
@@ -47,6 +48,7 @@ export function upsertStockPrices(prices: StockPrice[]) {
         price: price.price,
         change: Number.isFinite(price.change) ? price.change : 0,
         change_percent: Number.isFinite(price.change_percent) ? price.change_percent : 0,
+        volume: typeof price.volume === 'number' && Number.isFinite(price.volume) && price.volume >= 0 ? price.volume : null,
         currency: price.currency,
         updated_at: price.updated_at,
       });

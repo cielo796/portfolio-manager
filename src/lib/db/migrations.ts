@@ -16,7 +16,15 @@ const MIGRATIONS: Array<{
   { version: 3, name: 'sync-schema', up: createSyncSchema },
   { version: 4, name: 'price-history-cache', up: createPriceHistory },
   { version: 5, name: 'fundamentals-cache', up: createFundamentalsCache },
+  { version: 6, name: 'stock-price-volume', up: addStockPriceVolume },
 ];
+
+function addStockPriceVolume(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(stock_prices)').all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === 'volume')) {
+    db.exec('ALTER TABLE stock_prices ADD COLUMN volume REAL');
+  }
+}
 
 function createFundamentalsCache(db: Database.Database) {
   db.exec(`

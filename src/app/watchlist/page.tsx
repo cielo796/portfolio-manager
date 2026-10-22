@@ -3,11 +3,8 @@
 import { RefreshCw } from 'lucide-react';
 import { useWatchlist } from '@/hooks/use-watchlist';
 import { usePageRefresh } from '@/components/shell/refresh-context';
-import { Card } from '@/components/ui/card';
-import { AddWatchItemForm } from '@/components/watchlist/add-watch-item-form';
 import { TradeIdeasPanel } from '@/components/watchlist/trade-ideas-panel';
 import { WatchlistHeader } from '@/components/watchlist/watchlist-header';
-import { WatchlistListHeader } from '@/components/watchlist/watchlist-tabs';
 import { WatchlistTable } from '@/components/watchlist/watchlist-table';
 
 export default function WatchlistPage() {
@@ -27,19 +24,11 @@ export default function WatchlistPage() {
   }
 
   return (
-    <div className="p-2">
+    <div className="flex min-h-full min-w-0 flex-col gap-1 min-[900px]:h-full">
       <WatchlistHeader {...watchlist} />
 
-      <div className="flex flex-col gap-6">
-        <div className="space-y-6">
-          <Card>
-            <WatchlistListHeader {...watchlist} />
-            <AddWatchItemForm {...watchlist} />
-          </Card>
-
-          <WatchlistTable {...watchlist} />
-        </div>
-
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-1 min-[900px]:grid-cols-[minmax(0,1fr)_290px]">
+        <WatchlistTable {...watchlist} />
         <TradeIdeasPanel {...watchlist} />
       </div>
     </div>
