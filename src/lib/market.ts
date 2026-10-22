@@ -1,6 +1,6 @@
 import 'server-only';
 
-import type { MarketItem, MarketSnapshot } from '@/types';
+import type { ChartMarket, MarketItem, MarketSnapshot } from '@/types';
 
 export const MARKET_SYMBOLS = [
   { key: '^N225', name: '日経225' },
@@ -16,15 +16,62 @@ export const MARKET_SYMBOLS = [
   { key: 'GC=F', name: '金' },
 ] as const;
 
-type YahooChart = {
+export type YahooChart = {
   chart?: {
     error?: unknown;
     result?: Array<{
-      meta?: { regularMarketPrice?: number; regularMarketTime?: number; chartPreviousClose?: number };
-      indicators?: { quote?: Array<{ close?: Array<number | null> }> };
+      meta?: {
+        regularMarketPrice?: number; regularMarketTime?: number; chartPreviousClose?: number;
+        currency?: string; exchangeTimezoneName?: string;
+      };
+      timestamp?: number[];
+      indicators?: { quote?: Array<{
+        open?: Array<number | null>; high?: Array<number | null>; low?: Array<number | null>;
+        close?: Array<number | null>; volume?: Array<number | null>;
+      }> };
     }>;
   };
 };
+
+export function toYahooSymbol(symbol: string, market: ChartMarket): string {
+  const normalized = symbol.toUpperCase().trim();
+  if (market === 'JP') {
+    if (normalized.endsWith('.T')) return normalized;
+    return `${normalized.endsWith('.JP') ? normalized.slice(0, -3) : normalized}.T`;
+  }
+  if (market === 'FX' && !normalized.endsWith('=X')) {
+    const pair = normalized.replace(/[^A-Z]/g, '');
+    return pair.length === 6 ? `${pair}=X` : normalized;
+  }
+  return normalized;
+}
+
+const chartGlobal = globalThis as typeof globalThis & {
+  __portfolioYahooChartLimiter?: { active: number; queue: Array<() => void> };
+};
+// ルートごとのバンドルや開発時の再読み込みでも通信上限を共有する
+const chartLimiter = chartGlobal.__portfolioYahooChartLimiter ??= { active: 0, queue: [] };
+
+export async function fetchYahooChart(symbol: string, params: Record<string, string>): Promise<YahooChart> {
+  await new Promise<void>((resolve) => {
+    const start = () => { chartLimiter.active++; resolve(); };
+    if (chartLimiter.active < 4) start();
+    else chartLimiter.queue.push(start);
+  });
+  try {
+    const url = new URL(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`);
+    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+    url.searchParams.set('interval', '1d');
+    const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw new Error('chart_fetch_failed');
+    const data = await response.json() as YahooChart;
+    if (!data?.chart?.result?.[0] || data.chart.error) throw new Error('invalid_chart');
+    return data;
+  } finally {
+    chartLimiter.active--;
+    chartLimiter.queue.shift()?.();
+  }
+}
 
 const positive = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0;
@@ -59,12 +106,7 @@ export function createMarketReader() {
       const failed: string[] = [];
       const values = await Promise.all(MARKET_SYMBOLS.map(async ({ key, name }) => {
         try {
-          const url = new URL(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(key)}`);
-          url.searchParams.set('range', '5d');
-          url.searchParams.set('interval', '1d');
-          const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-          if (!response.ok) throw new Error('market_fetch_failed');
-          const item = parseMarketChart(await response.json() as YahooChart, key, name, new Date().toISOString());
+          const item = parseMarketChart(await fetchYahooChart(key, { range: '5d' }), key, name, new Date().toISOString());
           if (!item) throw new Error('invalid_market_chart');
           lastValues.set(key, item);
           return item;

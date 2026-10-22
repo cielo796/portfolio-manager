@@ -7,6 +7,7 @@ export { listTradeIdeas, createTradeIdea, updateTradeIdeaById, deleteTradeIdeaBy
 export { listWatchlistItems, createWatchlistItem, updateWatchlistItemById, deleteWatchlistItemById, updateWatchlistItemsLayout } from './watchlist';
 export { listTickerPresets, createTickerPreset, deleteTickerPresetById } from './ticker-presets';
 export { listStockPrices, upsertStockPrices } from './prices';
+export { listPriceHistory, upsertPriceHistory, readPriceHistory } from './price-history';
 export { listNewsItems, upsertNewsItems } from './news';
 export { exportBackupData, importBackupData, clearAllData } from './backup';
 export type { BackupData } from './backup';

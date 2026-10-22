@@ -14,7 +14,18 @@ const MIGRATIONS: Array<{
   { version: 1, name: 'baseline-schema', disableForeignKeys: true, up: createBaselineSchema },
   { version: 2, name: 'normalize-holding-sectors', up: normalizeHoldingSectors },
   { version: 3, name: 'sync-schema', up: createSyncSchema },
+  { version: 4, name: 'price-history-cache', up: createPriceHistory },
 ];
+
+function createPriceHistory(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS price_history (
+      symbol TEXT NOT NULL, market TEXT NOT NULL, date TEXT NOT NULL,
+      open REAL, high REAL, low REAL, close REAL NOT NULL, volume REAL,
+      updated_at TEXT NOT NULL, PRIMARY KEY (symbol, market, date)
+    );
+  `);
+}
 
 function createSyncSchema(db: Database.Database) {
   db.exec(`

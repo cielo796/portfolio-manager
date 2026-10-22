@@ -2,6 +2,42 @@ import type { SectorKey } from '@/lib/sectors';
 
 // 市場タイプ
 export type Market = 'US' | 'JP' | 'FX';
+export type ChartMarket = Market | 'INDEX';
+export type ChartRange = '3m' | '6m' | '1y' | '5y';
+export type ChartInterval = 'd' | 'w' | 'm';
+
+export interface Candle {
+  date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number;
+  volume: number | null;
+}
+
+export interface PriceHistoryRow extends Candle {
+  symbol: string;
+  market: ChartMarket;
+  updated_at: string;
+}
+
+export interface ChartData {
+  symbol: string;
+  market: ChartMarket;
+  currency: string;
+  candles: Candle[];
+  fetchedAt: string;
+  stale: boolean;
+}
+
+export interface SparklineItem {
+  symbol: string;
+  market: ChartMarket;
+  closes: number[];
+  high52w?: number;
+  low52w?: number;
+}
+
 export type WatchlistKey = 'main' | 'sub1' | 'sub2' | 'sub3' | 'sub4';
 
 // 取引タイプ
