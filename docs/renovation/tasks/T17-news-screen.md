@@ -33,7 +33,9 @@
 - 既存の `src/components/news-list.tsx` はホーム画面が使っている可能性があるので変更・削除しない。
 
 ## 確認
-`npx tsc --noEmit`、`npm run lint`、`npm run build`（`SQLITE_DB_PATH` に一時パスを設定して実行）。`SQLITE_DB_PATH` を一時DBに設定して `npm run dev -- -p 3013 --hostname 127.0.0.1` で `/news` が 200 になることを確認して停止する。**`SQLITE_DB_PATH` を設定せずに起動しないこと。**
+**同時に別のエージェントがホーム画面などを変更し、ビルドも行っている。`src/app/news/` と `src/components/news/` 以外には触れず、`git status` に出る他の変更は無視すること。`npm run build`・`npm run dev`・`next start` は実行しないこと（ビルドが衝突するため。画面の確認はレビュー担当が行う）。**
+
+`npx tsc --noEmit` と `npm run lint` を実行する。他のエージェントの作業中ファイルでエラーが出た場合は、レポートに書くだけでよい。
 
 ## レポート
 `docs/renovation/reports/T17.md` に AGENT_RULES.md の形式で書く。
