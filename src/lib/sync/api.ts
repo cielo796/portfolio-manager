@@ -39,7 +39,12 @@ export async function handleSync(request: Request, action: SyncAction, id?: stri
       return json(startPairing(db));
     }
     if (action === 'pair') return json(acceptPairing(db, parseBody(raw), request.headers.get('X-Forwarded-For')));
-    if (action === 'ping') return json({ deviceId: getDeviceId(db), deviceName: getDeviceName(db), serverTime: new Date().toISOString() });
+    if (action === 'ping') {
+      return json({
+        deviceId: getDeviceId(db), deviceName: getDeviceName(db), serverTime: new Date().toISOString(),
+        schemaVersion: db.pragma('user_version', { simple: true }),
+      });
+    }
     if (action === 'changes') {
       const serverTime = new Date().toISOString();
       return json({ changes: collectChanges(db, new URL(request.url).searchParams.get('since'), caller!.device_id), serverTime });
@@ -54,12 +59,18 @@ export async function handleSync(request: Request, action: SyncAction, id?: stri
     }
     if (action === 'peers' && request.method === 'GET') {
       const peers = db.prepare('SELECT * FROM sync_peers ORDER BY created_at, id').all() as SyncPeer[];
-      return json({ peers: await Promise.all(peers.map(async (peer) => {
-        try {
-          const ping = await httpTransport(getDeviceId(db), peer).ping();
-          return { ...publicPeer(peer), reachable: ping.deviceId === peer.device_id, serverTime: ping.serverTime };
-        } catch { return { ...publicPeer(peer), reachable: false }; }
-      })) });
+      return json({
+        peers: await Promise.all(peers.map(async (peer) => {
+          try {
+            const ping = await httpTransport(getDeviceId(db), peer).ping();
+            return { ...publicPeer(peer), reachable: ping.deviceId === peer.device_id, serverTime: ping.serverTime };
+          } catch { return { ...publicPeer(peer), reachable: false }; }
+        })),
+        self: {
+          deviceId: getDeviceId(db), deviceName: getDeviceName(db),
+          schemaVersion: db.pragma('user_version', { simple: true }),
+        },
+      });
     }
     if (action === 'peers') {
       assertIdle(db);

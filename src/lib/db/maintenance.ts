@@ -3,9 +3,8 @@ import 'server-only';
 import { getDb } from './connection';
 import { SYNC_TABLES } from './sync-tables';
 
-export function purgeDeletedRows(days = 90): number {
+export function purgeDeletedRows(days = 90, db = getDb()): number {
   if (!Number.isFinite(days) || days < 0) throw new RangeError('保持日数は0以上にしてください');
-  const db = getDb();
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   return db.transaction(() => {
     let removed = 0;

@@ -255,6 +255,7 @@ export interface SyncPing {
   deviceId: string;
   deviceName: string;
   serverTime: string;
+  schemaVersion: number;
 }
 export interface SyncTransport {
   ping(): Promise<SyncPing>;

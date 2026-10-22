@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SyncChanges, SyncPeer, SyncRow, SyncTable, SyncTransport } from '@/types';
+import type { SyncChanges, SyncPeer, SyncPing, SyncRow, SyncTable, SyncTransport } from '@/types';
 
 const initial = '2026-10-22T00:00:00.000Z';
 const edited = '2026-10-22T00:01:00.000Z';
@@ -43,7 +43,7 @@ describe('LAN同期エンジン・API', () => {
   }
   function direct(): SyncTransport {
     return {
-      ping: async () => ({ deviceId: identity(b), deviceName: 'B', serverTime: new Date().toISOString() }),
+      ping: async () => ({ deviceId: identity(b), deviceName: 'B', serverTime: new Date().toISOString(), schemaVersion: b.pragma('user_version', { simple: true }) as number }),
       changes: async (since) => ({ changes: sync.collectChanges(b, since, identity(a)), serverTime: new Date().toISOString() }),
       apply: async (changes, lastSyncedAt) => sync.applyChanges(b, changes, { lastSyncedAt }),
     };
@@ -227,9 +227,27 @@ describe('LAN同期エンジン・API', () => {
       .toEqual({ last_pulled_until: now, last_pushed_until: now });
   });
 
+  it('相手のスキーマ版数が違う・不明のときは409で止まり、データと同期位置を変えない', async () => {
+    idea(a);
+    const local = a.pragma('user_version', { simple: true }) as number;
+    const before = sync.collectChanges(a, null);
+    const beforePeer = a.prepare('SELECT * FROM sync_peers WHERE id = ?').get(peer.id);
+    const mismatch = direct();
+    mismatch.ping = async () => ({ deviceId: identity(b), deviceName: 'B', serverTime: new Date().toISOString(), schemaVersion: local - 1 });
+    await expect(engine.runSync(a, peer, mismatch)).rejects.toMatchObject({ status: 409 });
+    await expect(engine.runSync(a, peer, mismatch)).rejects.toThrow(
+      `相手PCとアプリのバージョンが違います（このPC: v${local}、相手: v${local - 1}）。両方を最新にしてから同期してください。`,
+    );
+    const legacy = direct();
+    legacy.ping = async () => ({ deviceId: identity(b), deviceName: 'B', serverTime: new Date().toISOString() } as SyncPing);
+    await expect(engine.runSync(a, peer, legacy)).rejects.toThrow('相手: v不明');
+    expect(sync.collectChanges(a, null)).toEqual(before);
+    expect(a.prepare('SELECT * FROM sync_peers WHERE id = ?').get(peer.id)).toEqual(beforePeer);
+  });
+
   it('3分を超える時刻差を警告する', async () => {
     const transport = direct();
-    transport.ping = async () => ({ deviceId: identity(b), deviceName: 'B', serverTime: '2026-10-22T00:07:00.000Z' });
+    transport.ping = async () => ({ deviceId: identity(b), deviceName: 'B', serverTime: '2026-10-22T00:07:00.000Z', schemaVersion: b.pragma('user_version', { simple: true }) as number });
     const result = await engine.runSync(a, peer, transport);
     expect(result.clockSkewMs).toBe(240_000);
     expect(result.warnings).toHaveLength(1);
@@ -377,6 +395,16 @@ describe('LAN同期エンジン・API', () => {
     expect(linked.status).toBe(201);
     expect(JSON.parse(fetch.mock.calls.at(-1)![1]!.body as string)).toMatchObject({ port: 3101 });
     delete process.env.PM_SYNC_PUBLIC_PORT;
+  });
+
+  it('peersは自分自身のデバイス情報とスキーマ版数も返す', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ deviceId: identity(b), deviceName: 'B', serverTime: now }));
+    const data = await (await request('peers', 'GET')).json();
+    expect(data.self).toEqual({
+      deviceId: identity(a), deviceName: expect.any(String), schemaVersion: a.pragma('user_version', { simple: true }),
+    });
+    expect(data.peers[0]).toMatchObject({ device_id: identity(b), reachable: true });
+    expect(JSON.stringify(data)).not.toContain(peer.secret);
   });
 
   it('ログは新しい50件、解除は自分側だけ、ID再生成はLinkと同期位置を消す', async () => {

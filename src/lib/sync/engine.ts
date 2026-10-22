@@ -8,6 +8,7 @@ import type { SyncChanges, SyncConflict, SyncPeer, SyncResult, SyncTransport } f
 import { applyChanges, collectChanges, tables } from './changes';
 import { assertIdle, duplicateDeviceMessage, state, SyncError, validTime } from './state';
 import { getDeviceId } from '@/lib/db/device';
+import { purgeDeletedRows } from '@/lib/db/maintenance';
 
 export async function backupDatabase(db: Database.Database): Promise<string> {
   const directory = path.join(path.dirname(db.name), 'sync-backups');
@@ -22,21 +23,6 @@ export async function backupDatabase(db: Database.Database): Promise<string> {
 
 function overlap(value: string | null): string | null {
   return value === null ? null : new Date(Date.parse(value) - 300_000).toISOString();
-}
-
-// 既存のmaintenanceはgetDb()専用のため、明示されたDBに同じ保持規則を適用する
-export function purgeDeletedRows(db: Database.Database): number {
-  const cutoff = new Date(Date.now() - 90 * 86_400_000).toISOString();
-  return db.transaction(() => {
-    let removed = 0;
-    for (const table of tables.filter((table) => table !== 'portfolios')) {
-      removed += db.prepare(`DELETE FROM ${table} WHERE deleted_at < ?`).run(cutoff).changes;
-    }
-    removed += db.prepare(`DELETE FROM portfolios WHERE deleted_at < ?
-      AND NOT EXISTS (SELECT 1 FROM holdings WHERE portfolio_id = portfolios.id)
-      AND NOT EXISTS (SELECT 1 FROM transactions WHERE portfolio_id = portfolios.id)`).run(cutoff).changes;
-    return removed;
-  })();
 }
 
 function mergeCanonical(changes: SyncChanges, corrections: SyncChanges) {
@@ -73,6 +59,12 @@ export async function runSync(db: Database.Database, inputPeer: SyncPeer, transp
     const ping = await transport.ping();
     if (ping.deviceId === getDeviceId(db)) throw new SyncError(duplicateDeviceMessage, 409);
     if (ping.deviceId !== peer.device_id || !validTime(ping.serverTime)) throw new SyncError('相手PCの情報が一致しません。', 502);
+    // 列構成が違うDB同士で同期すると原因の分かりにくい検証エラーになるため、先に版数を比べる
+    const localVersion = db.pragma('user_version', { simple: true }) as number;
+    const remoteVersion = typeof ping.schemaVersion === 'number' ? ping.schemaVersion : null;
+    if (remoteVersion !== localVersion) {
+      throw new SyncError(`相手PCとアプリのバージョンが違います（このPC: v${localVersion}、相手: v${remoteVersion ?? '不明'}）。両方を最新にしてから同期してください。`, 409);
+    }
     result.clockSkewMs = Date.parse(ping.serverTime) - (pingStarted + Date.now()) / 2;
     if (Math.abs(result.clockSkewMs) > 180_000) result.warnings.push('相手PCとの時刻差が3分を超えています。時計を確認してください。');
     const incoming = await transport.changes(overlap(peer.last_pulled_until));
@@ -93,7 +85,7 @@ export async function runSync(db: Database.Database, inputPeer: SyncPeer, transp
     addConflicts(reconciled.conflictDetails);
     const finishedAt = new Date().toISOString();
     db.prepare('UPDATE sync_peers SET last_pushed_until = ?, last_synced_at = ?, updated_at = ? WHERE id = ?').run(pushedUntil, finishedAt, finishedAt, peer.id);
-    purgeDeletedRows(db);
+    purgeDeletedRows(90, db);
     result.durationMs = Date.now() - started;
     db.prepare(`UPDATE sync_log SET finished_at = ?, status = 'success', received = ?, sent = ?, conflicts = ?, detail = ? WHERE id = ?`)
       .run(finishedAt, result.received, result.sent, result.conflicts, JSON.stringify(result), logId);
