@@ -15,6 +15,8 @@
 - `src/components/add-holding-modal.tsx`、`src/components/edit-holding-modal.tsx`、`src/components/sector-chart.tsx`、`src/components/holdings-table.tsx`（表示がある場合のみ）
 - `src/hooks/use-portfolio.ts`
 - `src/types/index.ts`（`SectorAllocation` の型変更が必要な場合のみ）
+- `src/lib/db/connection.ts`（下記「T02レビューの指摘」のみ）
+- `README.md`（プロジェクト構造の `sqlite.ts` の行を `db/` に直すだけ）
 - `docs/renovation/reports/T03.md`（新規）
 
 ## 仕様
@@ -30,6 +32,11 @@
    - セクター配分（`use-portfolio.ts` の `sectorAllocation`）は、キーを「`SectorKey` ／ `'cash'` ／ `'fx'`」で集計し、表示名は `getSectorLabel()`（現金は「現金」、FXは「FX」）、色は新しく `sectors.ts` に追加する `SECTOR_CHART_COLORS: Record<SectorKey | 'cash' | 'fx', string>` から取る。色は、今の `SECTOR_COLORS` の色をできるだけ引き継ぎ、13セクター＋現金＋FXで互いに見分けられるようにする。
    - `sector-chart.tsx` の凡例・ツールチップは日本語ラベルを表示する。
    - `SECTOR_COLORS` は削除し、参照が残っていないことを確認する。
+
+## T02レビューの指摘（このタスクで一緒に直す）
+1. `connection.ts`：`journal_mode = WAL` と `foreign_keys = ON` の PRAGMA が `getDb()` の呼び出しごと（＝クエリごと）に実行されている。DBを開いた直後の1回だけにする。
+2. `migrations.ts`：`runMigrations` の「外部キーを一時的に OFF にする」判定が `version === 1` に固定されている。マイグレーション定義に `disableForeignKeys?: boolean` を持たせ、未適用の中に1つでも `true` があれば OFF にする形に変える（version 1 は `true`、今回の version 2 は不要なので省略）。後続フェーズでテーブル再作成を伴うマイグレーションを足すための準備。
+3. `README.md` のプロジェクト構造で `sqlite.ts  # SQLiteデータアクセス` の行を `db/  # SQLiteデータアクセス（モジュール分割・マイグレーション）` に直す。
 
 ## 確認
 1. `npx tsc --noEmit`、`npm run lint`、`npm run build`

@@ -2,7 +2,7 @@ import 'server-only';
 
 import { Holding, Portfolio, TickerPreset, TradeIdea, Transaction, WatchlistItem, WatchlistKey } from '@/types';
 import { mockPortfolios } from '@/lib/mock-data';
-import { normalizeSectorKey, resolveSectorForSymbol } from '@/lib/sectors';
+import { normalizeSectorKey, resolveHoldingSector, resolveSectorForSymbol } from '@/lib/sectors';
 import { getDb } from './connection';
 import { isValidMarket, isValidWatchlistKey } from './validators';
 import { listPortfolios } from './portfolios';
@@ -108,7 +108,7 @@ export function importBackupData(data: Partial<BackupData>) {
       shares: Number(item.shares ?? 0),
       avg_cost: Number(item.avg_cost ?? 0),
       sort_order: Number.isInteger(item.sort_order) && item.sort_order >= 0 ? item.sort_order : index,
-      sector: item.sector ?? null,
+      sector: resolveHoldingSector(item.symbol, item.market, item.sector),
       memo: item.memo ?? null,
       created_at: item.created_at ?? new Date().toISOString(),
       updated_at: item.updated_at ?? new Date().toISOString(),

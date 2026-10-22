@@ -22,10 +22,10 @@ export function getDb(): Database.Database {
   if (!globalWithDb.__portfolioDb) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     globalWithDb.__portfolioDb = new Database(DB_PATH);
+    globalWithDb.__portfolioDb.pragma('journal_mode = WAL');
+    globalWithDb.__portfolioDb.pragma('foreign_keys = ON');
   }
   const db = globalWithDb.__portfolioDb;
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
 
   if (!globalWithDb.__portfolioDbInitialized) {
     runMigrations(db);

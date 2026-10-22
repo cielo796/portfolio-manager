@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { HoldingWithPrice } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
+import { SECTORS, normalizeSectorKey } from '@/lib/sectors';
 import { formatCurrency, getMarketCurrency } from '@/lib/utils';
 
 interface EditHoldingModalProps {
@@ -22,21 +23,6 @@ export interface EditHoldingData {
   sector?: string;
   memo?: string;
 }
-
-const SECTORS = [
-  { value: '', label: 'セクターを選択' },
-  { value: 'Technology', label: 'テクノロジー' },
-  { value: 'Healthcare', label: 'ヘルスケア' },
-  { value: 'Finance', label: '金融' },
-  { value: 'Consumer', label: '一般消費財' },
-  { value: 'Energy', label: 'エネルギー' },
-  { value: 'Industrial', label: '資本財' },
-  { value: 'Materials', label: '素材' },
-  { value: 'Utilities', label: '公益事業' },
-  { value: 'Real Estate', label: '不動産' },
-  { value: 'Communication', label: '通信' },
-  { value: 'Cash', label: '現金' },
-];
 
 export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
   isOpen,
@@ -63,7 +49,7 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
       name: holding.name || '',
       shares: holding.shares,
       avg_cost: isCash ? 1 : holding.avg_cost,
-      sector: holding.sector || (isCash ? 'Cash' : isFx ? 'FX' : ''),
+      sector: isCash || isFx ? '' : holding.sector ? normalizeSectorKey(holding.sector) : '',
       memo: holding.memo || '',
     });
     setErrors({});
@@ -99,7 +85,7 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
       await onSave(holding.id, {
         ...formData,
         avg_cost: isCash ? 1 : formData.avg_cost,
-        sector: isCash ? 'Cash' : isFx ? 'FX' : (formData.sector || undefined),
+        sector: isCash || isFx ? undefined : (formData.sector || ''),
         memo: formData.memo?.trim() || undefined,
         name: formData.name?.trim() || undefined,
       });
@@ -179,7 +165,10 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
                   label="セクター"
                   value={formData.sector || ''}
                   onChange={(e) => setFormData((prev) => ({ ...prev, sector: e.target.value }))}
-                  options={SECTORS}
+                  options={[
+                    { value: '', label: 'セクターを自動判定' },
+                    ...SECTORS.map(({ key, label }) => ({ value: key, label })),
+                  ]}
                 />
               )}
             </>

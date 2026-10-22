@@ -3,8 +3,14 @@ import 'server-only';
 import type Database from 'better-sqlite3';
 import { normalizeSectorKey, resolveSectorForSymbol } from '@/lib/sectors';
 
-const MIGRATIONS: Array<{ version: number; name: string; up: (db: Database.Database) => void }> = [
-  { version: 1, name: 'baseline-schema', up: createBaselineSchema },
+const MIGRATIONS: Array<{
+  version: number;
+  name: string;
+  disableForeignKeys?: boolean;
+  up: (db: Database.Database) => void;
+}> = [
+  { version: 1, name: 'baseline-schema', disableForeignKeys: true, up: createBaselineSchema },
+  { version: 2, name: 'normalize-holding-sectors', up: normalizeHoldingSectors },
 ];
 
 export function runMigrations(db: Database.Database) {
@@ -14,7 +20,7 @@ export function runMigrations(db: Database.Database) {
   if (pending.length === 0) return;
 
   // FX対応のテーブル再作成に備え、トランザクションの外で切り替える
-  const needsForeignKeysOff = pending.some((migration) => migration.version === 1);
+  const needsForeignKeysOff = pending.some((migration) => migration.disableForeignKeys);
   const foreignKeys = db.pragma('foreign_keys', { simple: true }) as number;
   if (needsForeignKeysOff) db.pragma('foreign_keys = OFF');
   try {
@@ -26,6 +32,24 @@ export function runMigrations(db: Database.Database) {
     })();
   } finally {
     if (needsForeignKeysOff) db.pragma(`foreign_keys = ${foreignKeys}`);
+  }
+}
+
+function normalizeHoldingSectors(db: Database.Database) {
+  const rows = db.prepare('SELECT id, symbol, market, sector FROM holdings').all() as Array<{
+    id: string;
+    symbol: string;
+    market: string;
+    sector: string | null;
+  }>;
+  const update = db.prepare('UPDATE holdings SET sector = ? WHERE id = ?');
+  for (const row of rows) {
+    const legacySector = row.sector?.trim().toLowerCase();
+    const sector = row.symbol.toUpperCase().trim() === 'CASH' || row.market === 'FX' ||
+      legacySector === 'cash' || legacySector === 'fx'
+      ? null
+      : normalizeSectorKey(row.sector);
+    if (sector !== row.sector) update.run(sector, row.id);
   }
 }
 

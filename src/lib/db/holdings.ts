@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { Holding } from '@/types';
+import { resolveHoldingSector } from '@/lib/sectors';
 import { getDb } from './connection';
 
 export function listHoldings(): Holding[] {
@@ -27,7 +28,7 @@ export function createHolding(input: NewHoldingInput): Holding {
     shares: input.shares,
     avg_cost: input.avg_cost,
     sort_order: (maxSortOrder.maxSortOrder ?? -1) + 1,
-    sector: input.sector?.trim() || undefined,
+    sector: resolveHoldingSector(input.symbol, input.market, input.sector) ?? undefined,
     memo: input.memo?.trim() || undefined,
     created_at: now,
     updated_at: now,
@@ -60,7 +61,11 @@ export function updateHoldingById(id: string, updates: UpdateHoldingInput): Hold
     name: updates.name !== undefined ? updates.name : current.name,
     shares: updates.shares !== undefined ? updates.shares : current.shares,
     avg_cost: updates.avg_cost !== undefined ? updates.avg_cost : current.avg_cost,
-    sector: updates.sector !== undefined ? updates.sector : current.sector,
+    sector: resolveHoldingSector(
+      current.symbol,
+      current.market,
+      updates.sector !== undefined ? updates.sector : current.sector
+    ) ?? undefined,
     memo: updates.memo !== undefined ? updates.memo : current.memo,
     updated_at: now,
   };

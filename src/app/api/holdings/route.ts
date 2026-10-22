@@ -12,7 +12,7 @@ type CreateHoldingRequest = {
   market?: Market;
   shares?: number;
   avg_cost?: number;
-  sector?: string;
+  sector?: string | null;
   memo?: string;
 };
 
@@ -70,10 +70,10 @@ export async function POST(request: Request) {
       market: body.market,
       shares,
       avg_cost: avgCost,
-      sector: isCash ? 'Cash' : body.sector,
+      sector: body.sector ?? undefined,
       memo: body.memo,
     });
-    return NextResponse.json({ holding }, { status: 201 });
+    return NextResponse.json({ holding: { ...holding, sector: holding.sector ?? null } }, { status: 201 });
   } catch {
     return NextResponse.json({ error: '銘柄の保存に失敗しました。' }, { status: 500 });
   }

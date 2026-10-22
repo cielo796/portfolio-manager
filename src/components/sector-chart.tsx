@@ -26,7 +26,7 @@ const CustomTooltip: React.FC<{
     const item = payload[0].payload;
     return (
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl">
-        <p className="font-medium text-slate-100">{item.sector}</p>
+        <p className="font-medium text-slate-100">{item.label}</p>
         <p className="text-sm text-slate-400 mt-1">
           {formatCurrency(item.value)} ({item.percent.toFixed(1)}%)
         </p>
@@ -100,7 +100,7 @@ export const SectorChart: React.FC<SectorChartProps> = ({ data }) => {
             outerRadius={100}
             innerRadius={60}
             dataKey="value"
-            nameKey="sector"
+            nameKey="label"
             strokeWidth={2}
             stroke="#1e293b"
           >

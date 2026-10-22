@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
+import { SECTORS } from '@/lib/sectors';
 import { Market, TickerPreset } from '@/types';
 import { normalizeFxSymbol } from '@/lib/utils';
 
@@ -47,20 +48,6 @@ export interface HoldingFormData {
   memo?: string;
 }
 
-const SECTORS = [
-  { value: '', label: 'セクターを選択' },
-  { value: 'Technology', label: 'テクノロジー' },
-  { value: 'Healthcare', label: 'ヘルスケア' },
-  { value: 'Finance', label: '金融' },
-  { value: 'Consumer', label: '一般消費財' },
-  { value: 'Energy', label: 'エネルギー' },
-  { value: 'Industrial', label: '資本財' },
-  { value: 'Materials', label: '素材' },
-  { value: 'Utilities', label: '公益事業' },
-  { value: 'Real Estate', label: '不動産' },
-  { value: 'Communication', label: '通信' },
-];
-
 export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
   isOpen,
   onClose,
@@ -102,7 +89,7 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
       symbol: preset.symbol,
       market: preset.market,
       name: preset.name ?? prev.name,
-      sector: preset.market === 'FX' ? 'FX' : prev.sector,
+      sector: preset.market === 'FX' ? '' : prev.sector,
     }));
   };
 
@@ -158,7 +145,7 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
               shares: cashAmount,
               name: formData.name?.trim() || defaultCashName(cashMarket),
               avg_cost: 1,
-              sector: 'Cash',
+              sector: undefined,
             }
           : isFxPosition
           ? {
@@ -168,7 +155,7 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
               shares: quantity,
               avg_cost: avgCost,
               name: `${normalizedFxSymbol.slice(0, 3)}/${normalizedFxSymbol.slice(3, 6)}`,
-              sector: 'FX',
+              sector: undefined,
             }
           : {
               ...formData,
@@ -248,7 +235,7 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
                   shares: 0,
                   name: defaultCashName('JP'),
                   avg_cost: 1,
-                  sector: 'Cash',
+                  sector: undefined,
                 }));
                 return;
               }
@@ -261,7 +248,7 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
                   shares: 0,
                   name: '',
                   avg_cost: 0,
-                  sector: 'FX',
+                  sector: undefined,
                 }));
                 return;
               }
@@ -407,7 +394,10 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
               label="セクター"
               value={formData.sector || ''}
               onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
-              options={SECTORS}
+              options={[
+                { value: '', label: 'セクターを自動判定' },
+                ...SECTORS.map(({ key, label }) => ({ value: key, label })),
+              ]}
             />
           )}
 

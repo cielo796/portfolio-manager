@@ -20,7 +20,8 @@ import {
   mockNews, 
   mockExchangeRate 
 } from '@/lib/mock-data';
-import { getMarketCurrency, SECTOR_COLORS } from '@/lib/utils';
+import { getMarketCurrency } from '@/lib/utils';
+import { getSectorLabel, normalizeSectorKey, SECTOR_CHART_COLORS } from '@/lib/sectors';
 
 const isCashHolding = (holding: Holding | HoldingWithPrice) => holding.symbol === 'CASH';
 const isFxHolding = (holding: Holding | HoldingWithPrice) => holding.market === 'FX';
@@ -280,21 +281,22 @@ export const usePortfolio = () => {
     : 0;
 
   // セクター配分計算
-  const sectorAllocation: SectorAllocation[] = Object.entries(
+  const sectorAllocation: SectorAllocation[] = Array.from(
     holdingsWithPrices.reduce((acc, holding) => {
       const sector = isCashHolding(holding)
-        ? (holding.sector || 'Cash')
+        ? 'cash'
         : isFxHolding(holding)
-        ? (holding.sector || 'FX')
-        : (holding.sector || 'その他');
-      acc[sector] = (acc[sector] || 0) + (holding.current_value_jpy ?? 0);
+        ? 'fx'
+        : normalizeSectorKey(holding.sector);
+      acc.set(sector, (acc.get(sector) ?? 0) + (holding.current_value_jpy ?? 0));
       return acc;
-    }, {} as Record<string, number>)
+    }, new Map<SectorAllocation['sector'], number>())
   ).map(([sector, value]) => ({
     sector,
+    label: sector === 'cash' ? '現金' : sector === 'fx' ? 'FX' : getSectorLabel(sector),
     value,
     percent: summary.total_value_jpy > 0 ? (value / summary.total_value_jpy) * 100 : 0,
-    color: SECTOR_COLORS[sector] || SECTOR_COLORS['その他'],
+    color: SECTOR_CHART_COLORS[sector],
   }));
 
   // 銘柄別配分計算

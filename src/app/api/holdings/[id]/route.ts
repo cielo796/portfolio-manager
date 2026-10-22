@@ -8,7 +8,7 @@ type UpdateHoldingRequest = {
   name?: string;
   shares?: number;
   avg_cost?: number;
-  sector?: string;
+  sector?: string | null;
   memo?: string;
 };
 
@@ -26,7 +26,7 @@ export async function PATCH(request: Request, context: Context) {
     return NextResponse.json({ error: '不正なリクエストです。' }, { status: 400 });
   }
 
-  const updates: UpdateHoldingRequest = {};
+  const updates: Omit<UpdateHoldingRequest, 'sector'> & { sector?: string } = {};
 
   if (body.name !== undefined) {
     updates.name = body.name.trim() || undefined;
@@ -46,7 +46,7 @@ export async function PATCH(request: Request, context: Context) {
     updates.avg_cost = avgCost;
   }
   if (body.sector !== undefined) {
-    updates.sector = body.sector.trim() || undefined;
+    updates.sector = body.sector?.trim() || '';
   }
   if (body.memo !== undefined) {
     updates.memo = body.memo.trim() || undefined;
@@ -57,7 +57,7 @@ export async function PATCH(request: Request, context: Context) {
     return NextResponse.json({ error: '保有銘柄が見つかりません。' }, { status: 404 });
   }
 
-  return NextResponse.json({ holding });
+  return NextResponse.json({ holding: { ...holding, sector: holding.sector ?? null } });
 }
 
 export async function DELETE(_request: Request, context: Context) {

@@ -107,6 +107,24 @@ export const SECTORS: SectorDefinition[] = [
 
 export const SECTOR_KEYS = SECTORS.map((sector) => sector.key);
 
+export const SECTOR_CHART_COLORS: Record<SectorKey | 'cash' | 'fx', string> = {
+  technology: '#3b82f6',
+  communication: '#06b6d4',
+  consumer_discretionary: '#ec4899',
+  consumer_staples: '#a3e635',
+  healthcare: '#10b981',
+  financials: '#f59e0b',
+  industrials: '#8b5cf6',
+  energy: '#ef4444',
+  materials: '#6366f1',
+  utilities: '#14b8a6',
+  real_estate: '#f97316',
+  etf: '#e879f9',
+  other: '#64748b',
+  cash: '#22c55e',
+  fx: '#22d3ee',
+};
+
 const SECTOR_MAP = new Map<string, SectorDefinition>(SECTORS.map((sector) => [sector.key, sector]));
 
 export const UNCLASSIFIED_SECTOR: SectorKey = 'other';
@@ -343,4 +361,10 @@ export const resolveSectorForSymbol = (symbol: string, market: string): SectorKe
   if (market === 'FX') return 'other';
   if (market === 'US') return findUsStockMaster(symbol)?.sector ?? UNCLASSIFIED_SECTOR;
   return UNCLASSIFIED_SECTOR;
+};
+
+/** 現金・FXのセクターは保存せず、株式の未指定値は銘柄から補完する。 */
+export const resolveHoldingSector = (symbol: string, market: string, sector?: string | null): SectorKey | null => {
+  if (symbol.toUpperCase().trim() === 'CASH' || market === 'FX') return null;
+  return sector?.trim() ? normalizeSectorKey(sector) : resolveSectorForSymbol(symbol, market);
 };

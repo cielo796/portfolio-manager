@@ -2,6 +2,7 @@ import 'server-only';
 
 import type Database from 'better-sqlite3';
 import { mockHoldings, mockPortfolios, mockTransactions } from '@/lib/mock-data';
+import { resolveHoldingSector } from '@/lib/sectors';
 
 export function seedIfEmpty(db: Database.Database) {
   const portfolioCount = db.prepare('SELECT COUNT(*) as count FROM portfolios').get() as { count: number };
@@ -33,7 +34,7 @@ export function seedIfEmpty(db: Database.Database) {
         ...holding,
         symbol: holding.symbol.toUpperCase().trim(),
         name: holding.name ?? null,
-        sector: holding.sector ?? null,
+        sector: resolveHoldingSector(holding.symbol, holding.market, holding.sector),
         memo: holding.memo ?? null,
       });
     }

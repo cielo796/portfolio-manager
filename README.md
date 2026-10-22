@@ -70,7 +70,7 @@ portfolio-manager/
 │   ├── hooks/                 # カスタムフック
 │   │   └── use-portfolio.ts
 │   ├── lib/                   # ユーティリティ
-│   │   ├── sqlite.ts         # SQLiteデータアクセス
+│   │   ├── db/               # SQLiteデータアクセス（モジュール分割・マイグレーション）
 │   │   ├── sectors.ts        # セクター定義・自動判定
 │   │   ├── utils.ts          # 共通関数
 │   │   └── mock-data.ts      # モックデータ

@@ -1,3 +1,5 @@
+import type { SectorKey } from '@/lib/sectors';
+
 // 市場タイプ
 export type Market = 'US' | 'JP' | 'FX';
 export type WatchlistKey = 'main' | 'sub1' | 'sub2' | 'sub3' | 'sub4';
@@ -174,7 +176,8 @@ export interface PortfolioSummary {
 
 // セクター配分
 export interface SectorAllocation {
-  sector: string;
+  sector: SectorKey | 'cash' | 'fx';
+  label: string;
   value: number;
   percent: number;
   color: string;
