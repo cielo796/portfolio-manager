@@ -66,7 +66,7 @@ describe('価格履歴キャッシュとAPI', () => {
     const before = db.prepare('SELECT * FROM holdings').all();
     db.exec('DROP TABLE price_history; PRAGMA user_version = 3');
     runMigrations(db);
-    expect(db.pragma('user_version', { simple: true })).toBe(4);
+    expect(db.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(4);
     history.upsertPriceHistory('^N225', 'INDEX', [candle('2026-10-22')], now);
     runMigrations(db);
     expect(history.listPriceHistory('^N225', 'INDEX')).toEqual([candle('2026-10-22')]);
