@@ -103,6 +103,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
         >
           {holdings.map((holding) => {
             const isCash = holding.symbol === 'CASH';
+            const isMissing = holding.price_status === 'missing';
             const isFx = holding.market === 'FX';
             const currency = getMarketCurrency(holding.market, holding.symbol);
             const profitLossPercent = holding.profit_loss_percent ?? 0;
@@ -189,17 +190,21 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
                   )}
                 </td>
                 <td className="py-4 text-right">
-                  <div className="flex flex-col items-end">
-                    <span className="text-slate-200">
-                      {isCash ? '-' : formatCurrency(holding.current_price ?? 0, currency)}
-                    </span>
-                    {!isCash && (
-                      <div className={`flex items-center gap-1 text-sm ${getProfitLossColor(changePercent)}`}>
-                        {getChangeIcon(changePercent)}
-                        <span>{formatPercent(changePercent)}</span>
-                      </div>
-                    )}
-                  </div>
+                  {isMissing ? (
+                    <span className="text-slate-400">価格未取得</span>
+                  ) : (
+                    <div className="flex flex-col items-end">
+                      <span className="text-slate-200">
+                        {isCash ? '-' : formatCurrency(holding.current_price ?? 0, currency)}
+                      </span>
+                      {!isCash && (
+                        <div className={`flex items-center gap-1 text-sm ${getProfitLossColor(changePercent)}`}>
+                          {getChangeIcon(changePercent)}
+                          <span>{formatPercent(changePercent)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </td>
                 <td className="py-4 text-right">
                   <div className="flex flex-col items-end">
@@ -214,14 +219,18 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
                   </div>
                 </td>
                 <td className="py-4 pr-2 text-right">
-                  <div className={`flex flex-col items-end ${getProfitLossColor(profitLoss)}`}>
-                    <span className="font-medium">
-                      {profitLoss >= 0 ? '+' : ''}{formatCurrency(profitLoss, 'JPY')}
-                    </span>
-                    <span className="text-sm">
-                      {isCash ? '-' : formatPercent(profitLossPercent)}
-                    </span>
-                  </div>
+                  {isMissing ? (
+                    <span className="text-slate-400">価格未取得</span>
+                  ) : (
+                    <div className={`flex flex-col items-end ${getProfitLossColor(profitLoss)}`}>
+                      <span className="font-medium">
+                        {profitLoss >= 0 ? '+' : ''}{formatCurrency(profitLoss, 'JPY')}
+                      </span>
+                      <span className="text-sm">
+                        {isCash ? '-' : formatPercent(profitLossPercent)}
+                      </span>
+                    </div>
+                  )}
                 </td>
               </tr>
             );

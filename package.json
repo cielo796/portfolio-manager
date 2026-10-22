@@ -9,6 +9,7 @@
     "build": "cross-env NODE_OPTIONS=--require=./scripts/node-readlink-eisdir-fix.cjs next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "desktop": "npm run desktop:start",
     "desktop:dev": "node electron/desktop-runner.mjs dev",
     "desktop:start": "node electron/desktop-runner.mjs start"
@@ -35,6 +36,7 @@
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vitest": "^4.1.12",
     "wait-on": "^9.0.3"
   }
 }

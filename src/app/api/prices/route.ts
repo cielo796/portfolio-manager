@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Market, StockPrice } from '@/types';
 import { getMarketCurrency } from '@/lib/utils';
+import { priceKey } from '@/lib/price-key';
 import { listStockPrices, upsertStockPrices } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
     if (!item?.symbol || !isValidMarket(item.market)) continue;
     const symbol = normalizeSymbol(item.symbol);
     if (!symbol || symbol === 'CASH') continue;
-    const key = `${symbol}|${item.market}`;
+    const key = priceKey(symbol, item.market);
     if (!unique.has(key)) {
       unique.set(key, {
         symbol,
@@ -163,7 +164,7 @@ export async function POST(request: Request) {
         updated_at: now,
       };
 
-      return [item.symbol, stockPrice] as const;
+      return [priceKey(item.symbol, item.market), stockPrice] as const;
     })
   );
 

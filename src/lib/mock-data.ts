@@ -1,4 +1,5 @@
 import { Portfolio, Holding, StockPrice, NewsItem, ExchangeRate, Transaction } from '@/types';
+import { priceKey } from '@/lib/price-key';
 
 // モック：ポートフォリオ（口座）
 export const mockPortfolios: Portfolio[] = [
@@ -116,7 +117,7 @@ export const mockHoldings: Holding[] = [
 
 // モック：株価データ
 export const mockStockPrices: Record<string, StockPrice> = {
-  'NVDA': {
+  [priceKey('NVDA', 'US')]: {
     symbol: 'NVDA',
     market: 'US',
     name: 'NVIDIA Corporation',
@@ -126,7 +127,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'USD',
     updated_at: new Date().toISOString(),
   },
-  'AAPL': {
+  [priceKey('AAPL', 'US')]: {
     symbol: 'AAPL',
     market: 'US',
     name: 'Apple Inc.',
@@ -136,7 +137,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'USD',
     updated_at: new Date().toISOString(),
   },
-  'MSFT': {
+  [priceKey('MSFT', 'US')]: {
     symbol: 'MSFT',
     market: 'US',
     name: 'Microsoft Corporation',
@@ -146,7 +147,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'USD',
     updated_at: new Date().toISOString(),
   },
-  '7203': {
+  [priceKey('7203', 'JP')]: {
     symbol: '7203',
     market: 'JP',
     name: 'トヨタ自動車',
@@ -156,7 +157,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'JPY',
     updated_at: new Date().toISOString(),
   },
-  '6758': {
+  [priceKey('6758', 'JP')]: {
     symbol: '6758',
     market: 'JP',
     name: 'ソニーグループ',
@@ -166,7 +167,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'JPY',
     updated_at: new Date().toISOString(),
   },
-  '8306': {
+  [priceKey('8306', 'JP')]: {
     symbol: '8306',
     market: 'JP',
     name: '三菱UFJフィナンシャル・グループ',
@@ -176,7 +177,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'JPY',
     updated_at: new Date().toISOString(),
   },
-  'USDJPY': {
+  [priceKey('USDJPY', 'FX')]: {
     symbol: 'USDJPY',
     market: 'FX',
     name: 'USD/JPY',

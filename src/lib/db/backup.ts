@@ -291,7 +291,6 @@ export function importBackupData(data: Partial<BackupData>) {
           description: portfolio.description ?? null,
         });
       }
-      return;
     }
 
     for (const portfolio of portfolios) {

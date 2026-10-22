@@ -149,6 +149,7 @@ export interface TradeIdea {
 
 // 保有銘柄 + 株価情報（表示用）
 export interface HoldingWithPrice extends Holding {
+  price_status: 'live' | 'missing' | 'cash';
   current_price?: number;
   current_value?: number;
   current_value_jpy?: number;
@@ -172,6 +173,7 @@ export interface PortfolioSummary {
   cash_value_jpy: number;
   daily_change: number;
   daily_change_percent: number;
+  missing_price_count: number;
 }
 
 // セクター配分

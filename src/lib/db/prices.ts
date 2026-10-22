@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { StockPrice } from '@/types';
+import { priceKey } from '@/lib/price-key';
 import { isValidMarket } from './validators';
 import { getDb } from './connection';
 
@@ -15,7 +16,7 @@ export function listStockPrices(): Record<string, StockPrice> {
     .all() as StockPrice[];
 
   return rows.reduce<Record<string, StockPrice>>((acc, price) => {
-    acc[price.symbol] = price;
+    acc[priceKey(price.symbol, price.market)] = price;
     return acc;
   }, {});
 }

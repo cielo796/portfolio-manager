@@ -1,17 +1,13 @@
 ﻿'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Portfolio, 
   Holding, 
-  HoldingWithPrice, 
   StockPrice, 
   NewsItem, 
   ExchangeRate,
-  Transaction,
-  PortfolioSummary,
-  SectorAllocation,
-  HoldingAllocation
+  Transaction
 } from '@/types';
 import { 
   mockPortfolios, 
@@ -20,25 +16,13 @@ import {
   mockNews, 
   mockExchangeRate 
 } from '@/lib/mock-data';
-import { getMarketCurrency } from '@/lib/utils';
-import { getSectorLabel, normalizeSectorKey, SECTOR_CHART_COLORS } from '@/lib/sectors';
-
-const isCashHolding = (holding: Holding | HoldingWithPrice) => holding.symbol === 'CASH';
-const isFxHolding = (holding: Holding | HoldingWithPrice) => holding.market === 'FX';
-const HOLDING_ALLOCATION_COLORS = [
-  '#38bdf8',
-  '#22c55e',
-  '#f472b6',
-  '#60a5fa',
-  '#a78bfa',
-  '#f59e0b',
-  '#14b8a6',
-  '#ef4444',
-  '#eab308',
-  '#94a3b8',
-  '#fb7185',
-  '#2dd4bf',
-];
+import { priceKey } from '@/lib/price-key';
+import {
+  computeHoldingsWithPrices,
+  computeSummary,
+  computeSectorAllocation,
+  computeHoldingAllocation,
+} from '@/lib/portfolio-calc';
 
 export const usePortfolio = () => {
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
@@ -83,12 +67,9 @@ export const usePortfolio = () => {
         stockPrices?: Record<string, StockPrice>;
         news?: NewsItem[];
       };
-      const savedStockPrices = data.stockPrices ?? {};
-      const nextStockPrices = {
-        ...mockStockPrices,
-        ...savedStockPrices,
-      };
-      const usdJpyRate = nextStockPrices.USDJPY?.price;
+      const nextStockPrices = data.stockPrices ?? {};
+      const usdJpyPrice = nextStockPrices[priceKey('USDJPY', 'FX')];
+      const usdJpyRate = usdJpyPrice?.price;
 
       setPortfolios(data.portfolios ?? []);
       setHoldings(data.holdings ?? []);
@@ -99,8 +80,10 @@ export const usePortfolio = () => {
         setExchangeRate((prev) => ({
           ...prev,
           rate: usdJpyRate,
-          updated_at: nextStockPrices.USDJPY?.updated_at ?? prev.updated_at,
+          updated_at: usdJpyPrice?.updated_at ?? prev.updated_at,
         }));
+      } else {
+        setExchangeRate(mockExchangeRate);
       }
     } catch {
       // API未起動時などのフォールバック
@@ -165,12 +148,13 @@ export const usePortfolio = () => {
         }));
       }
 
-      const usdJpyRate = nextPrices.USDJPY?.price;
+      const usdJpyPrice = nextPrices[priceKey('USDJPY', 'FX')];
+      const usdJpyRate = usdJpyPrice?.price;
       if (usdJpyRate && Number.isFinite(usdJpyRate) && usdJpyRate > 0) {
         setExchangeRate((prev) => ({
           ...prev,
           rate: usdJpyRate,
-          updated_at: nextPrices.USDJPY?.updated_at ?? data.updatedAt ?? new Date().toISOString(),
+          updated_at: usdJpyPrice?.updated_at ?? data.updatedAt ?? new Date().toISOString(),
         }));
       }
     } finally {
@@ -178,159 +162,22 @@ export const usePortfolio = () => {
     }
   }, [holdings]);
 
-  // 保有銘柄に現在価格を追加
-  const holdingsWithPrices: HoldingWithPrice[] = holdings.map(holding => {
-    const isCash = isCashHolding(holding);
-    const isFx = isFxHolding(holding);
-    const priceData = stockPrices[holding.symbol];
-    const currentPrice = isCash ? 1 : (priceData?.price ?? holding.avg_cost);
-    const currentValue = isCash ? holding.shares : currentPrice * holding.shares;
-    const costBasis = isCash ? holding.shares : holding.avg_cost * holding.shares;
-    
-    // 円換算
-    const isUS = holding.market === 'US';
-    const quoteCurrency = getMarketCurrency(holding.market, holding.symbol);
-    const isUsdQuotedFx = isFx && quoteCurrency === 'USD';
-    const rate = exchangeRate.rate;
-    const currentValueJpy = (isUS || isUsdQuotedFx) ? currentValue * rate : currentValue;
-    const costBasisJpy = (isUS || isUsdQuotedFx) ? costBasis * rate : costBasis;
-    const profitLoss = currentValueJpy - costBasisJpy;
-    const profitLossPercent = costBasisJpy > 0 ? (profitLoss / costBasisJpy) * 100 : 0;
-
-    return {
-      ...holding,
-      name: isCash
-        ? (holding.name || (holding.market === 'US' ? '米ドル現金' : '日本円現金'))
-        : isFx
-        ? (priceData?.name ?? holding.name ?? `${holding.symbol.slice(0, 3)}/${holding.symbol.slice(3, 6)}`)
-        : (priceData?.name ?? holding.name),
-      current_price: currentPrice,
-      current_value: currentValue,
-      current_value_jpy: currentValueJpy,
-      profit_loss: profitLoss,
-      profit_loss_percent: profitLossPercent,
-      change_percent: isCash ? 0 : (priceData?.change_percent ?? 0),
-    };
-  });
-
-  // ポートフォリオサマリー計算
-  const summary: PortfolioSummary = holdingsWithPrices.reduce(
-    (acc, holding) => {
-      const isCash = isCashHolding(holding);
-      const isFx = isFxHolding(holding);
-      const valueJpy = holding.current_value_jpy ?? 0;
-      const quoteCurrency = getMarketCurrency(holding.market, holding.symbol);
-      const isUsdQuotedFx = isFx && quoteCurrency === 'USD';
-      const costJpy = holding.market === 'US'
-        ? (isCash ? holding.shares : holding.avg_cost * holding.shares) * exchangeRate.rate
-        : isUsdQuotedFx
-        ? (isCash ? holding.shares : holding.avg_cost * holding.shares) * exchangeRate.rate
-        : (isCash ? holding.shares : holding.avg_cost * holding.shares);
-      
-      acc.total_value_jpy += valueJpy;
-      acc.total_cost_jpy += costJpy;
-
-      if (isCash) {
-        acc.cash_value_jpy += valueJpy;
-        if (holding.market === 'US') {
-          acc.cash_value_usd += holding.current_value ?? 0;
-        }
-      } else if (isFx) {
-        acc.fx_value_jpy += valueJpy;
-        if (quoteCurrency === 'USD') {
-          acc.fx_value_usd += holding.current_value ?? 0;
-        }
-      } else if (holding.market === 'US') {
-        acc.us_stock_value_usd += holding.current_value ?? 0;
-        acc.us_stock_value_jpy += valueJpy;
-      } else {
-        acc.jp_stock_value_jpy += valueJpy;
-      }
-      
-      // 日次変動
-      if (!isCash) {
-        const dailyChange = (holding.change_percent ?? 0) / 100 * valueJpy;
-        acc.daily_change += dailyChange;
-      }
-      
-      return acc;
-    },
-    {
-      total_value_jpy: 0,
-      total_cost_jpy: 0,
-      total_profit_loss: 0,
-      total_profit_loss_percent: 0,
-      us_stock_value_usd: 0,
-      us_stock_value_jpy: 0,
-      jp_stock_value_jpy: 0,
-      fx_value_usd: 0,
-      fx_value_jpy: 0,
-      cash_value_usd: 0,
-      cash_value_jpy: 0,
-      daily_change: 0,
-      daily_change_percent: 0,
-    }
+  const holdingsWithPrices = useMemo(
+    () => computeHoldingsWithPrices(holdings, stockPrices, exchangeRate.rate),
+    [holdings, stockPrices, exchangeRate.rate]
   );
-
-  summary.total_profit_loss = summary.total_value_jpy - summary.total_cost_jpy;
-  summary.total_profit_loss_percent = summary.total_cost_jpy > 0 
-    ? (summary.total_profit_loss / summary.total_cost_jpy) * 100 
-    : 0;
-  summary.daily_change_percent = summary.total_value_jpy > 0
-    ? (summary.daily_change / (summary.total_value_jpy - summary.daily_change)) * 100
-    : 0;
-
-  // セクター配分計算
-  const sectorAllocation: SectorAllocation[] = Array.from(
-    holdingsWithPrices.reduce((acc, holding) => {
-      const sector = isCashHolding(holding)
-        ? 'cash'
-        : isFxHolding(holding)
-        ? 'fx'
-        : normalizeSectorKey(holding.sector);
-      acc.set(sector, (acc.get(sector) ?? 0) + (holding.current_value_jpy ?? 0));
-      return acc;
-    }, new Map<SectorAllocation['sector'], number>())
-  ).map(([sector, value]) => ({
-    sector,
-    label: sector === 'cash' ? '現金' : sector === 'fx' ? 'FX' : getSectorLabel(sector),
-    value,
-    percent: summary.total_value_jpy > 0 ? (value / summary.total_value_jpy) * 100 : 0,
-    color: SECTOR_CHART_COLORS[sector],
-  }));
-
-  // 銘柄別配分計算
-  const holdingAllocation: HoldingAllocation[] = Array.from(
-    holdingsWithPrices
-      .reduce((acc, holding) => {
-        const key = `${holding.symbol}|${holding.market}`;
-        const current = acc.get(key);
-        const value = holding.current_value_jpy ?? 0;
-
-        if (current) {
-          current.value += value;
-          return acc;
-        }
-
-        acc.set(key, {
-          symbol: holding.symbol,
-          name: holding.name,
-          market: holding.market,
-          value,
-          percent: 0,
-          color: '',
-        });
-        return acc;
-      }, new Map<string, HoldingAllocation>())
-      .values()
-  )
-    .filter((item) => Number.isFinite(item.value) && item.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .map((item, index) => ({
-      ...item,
-      percent: summary.total_value_jpy > 0 ? (item.value / summary.total_value_jpy) * 100 : 0,
-      color: HOLDING_ALLOCATION_COLORS[index % HOLDING_ALLOCATION_COLORS.length],
-    }));
+  const summary = useMemo(
+    () => computeSummary(holdingsWithPrices, exchangeRate.rate),
+    [holdingsWithPrices, exchangeRate.rate]
+  );
+  const sectorAllocation = useMemo(
+    () => computeSectorAllocation(holdingsWithPrices, summary.total_value_jpy),
+    [holdingsWithPrices, summary.total_value_jpy]
+  );
+  const holdingAllocation = useMemo(
+    () => computeHoldingAllocation(holdingsWithPrices, summary.total_value_jpy),
+    [holdingsWithPrices, summary.total_value_jpy]
+  );
 
   // 銘柄追加
   const addHolding = useCallback(async (holding: Omit<Holding, 'id' | 'created_at' | 'updated_at' | 'sort_order'>) => {

@@ -16,6 +16,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { priceKey } from '@/lib/price-key';
 import { usePortfolio } from '@/hooks/use-portfolio';
 import { useTickerPresets } from '@/hooks/use-ticker-presets';
 import { FundamentalMetrics, Market, StockPrice, TradeIdea, WatchlistItem, WatchlistKey } from '@/types';
@@ -61,8 +62,6 @@ const getMarketLabel = (market: Market) => {
   if (market === 'JP') return '日本株';
   return 'FX';
 };
-
-const getPriceKey = (symbol: string, market: Market) => `${symbol}|${market}`;
 
 const toDisplayCurrency = (currency?: string): 'JPY' | 'USD' =>
   currency === 'USD' ? 'USD' : 'JPY';
@@ -186,12 +185,6 @@ const normalizeLayout = (items: WatchlistItem[]) =>
       }))
   );
 
-const pricesToPriceMap = (prices: Record<string, StockPrice> | undefined) =>
-  Object.values(prices ?? {}).reduce<Record<string, StockPrice>>((acc, price) => {
-    acc[getPriceKey(price.symbol, price.market)] = price;
-    return acc;
-  }, {});
-
 const getLatestPriceUpdatedAt = (prices: Record<string, StockPrice>) =>
   Object.values(prices).reduce<string | null>((latest, price) => {
     if (!price.updated_at) return latest;
@@ -249,7 +242,7 @@ export default function WatchlistPage() {
 
     for (const holding of holdings) {
       if (holding.symbol === 'CASH') continue;
-      const key = getPriceKey(holding.symbol, holding.market);
+      const key = priceKey(holding.symbol, holding.market);
       if (!unique.has(key)) {
         unique.set(key, {
           value: key,
@@ -262,7 +255,7 @@ export default function WatchlistPage() {
     }
 
     for (const preset of tickerPresets) {
-      const key = getPriceKey(preset.symbol, preset.market);
+      const key = priceKey(preset.symbol, preset.market);
       if (!unique.has(key)) {
         unique.set(key, {
           value: key,
@@ -275,7 +268,7 @@ export default function WatchlistPage() {
     }
 
     for (const item of watchlistItems) {
-      const key = getPriceKey(item.symbol, item.market);
+      const key = priceKey(item.symbol, item.market);
       if (!unique.has(key)) {
         unique.set(key, {
           value: key,
@@ -288,7 +281,7 @@ export default function WatchlistPage() {
     }
 
     for (const idea of tradeIdeas) {
-      const key = getPriceKey(idea.symbol, idea.market);
+      const key = priceKey(idea.symbol, idea.market);
       if (!unique.has(key)) {
         unique.set(key, {
           value: key,
@@ -325,7 +318,7 @@ export default function WatchlistPage() {
         const watchlistData = (await watchlistResponse.json()) as { watchlistItems: WatchlistItem[] };
         const ideasData = (await ideasResponse.json()) as { tradeIdeas: TradeIdea[] };
         const pricesData = (await pricesResponse.json()) as { prices?: Record<string, StockPrice> };
-        const savedPriceMap = pricesToPriceMap(pricesData.prices);
+        const savedPriceMap = pricesData.prices ?? {};
 
         setWatchlistItems(sortWatchlistItems(watchlistData.watchlistItems ?? []));
         setTradeIdeas(ideasData.tradeIdeas ?? []);
@@ -428,7 +421,7 @@ export default function WatchlistPage() {
     const symbols = Array.from(
       new Map(
         watchlistItems.map((item) => [
-          getPriceKey(item.symbol, item.market),
+          priceKey(item.symbol, item.market),
           {
             symbol: item.symbol,
             market: item.market,
@@ -465,13 +458,7 @@ export default function WatchlistPage() {
         prices?: Record<string, StockPrice>;
         updatedAt?: string;
       };
-      const nextPrices = Object.values(data.prices ?? {}).reduce<Record<string, StockPrice>>(
-        (acc, price) => {
-          acc[getPriceKey(price.symbol, price.market)] = price;
-          return acc;
-        },
-        {}
-      );
+      const nextPrices = data.prices ?? {};
       setPriceMap((prev) => ({
         ...prev,
         ...nextPrices,
@@ -704,7 +691,7 @@ export default function WatchlistPage() {
 
   const startEditIdea = (idea: TradeIdea) => {
     setEditingIdeaId(idea.id);
-    setEditIdeaSymbol(getPriceKey(idea.symbol, idea.market));
+    setEditIdeaSymbol(priceKey(idea.symbol, idea.market));
     setEditIdeaNote(idea.note);
   };
 
@@ -1085,8 +1072,8 @@ export default function WatchlistPage() {
                       <span className="text-xs text-slate-500">{group.items.length}銘柄</span>
                     </div>
                 {group.items.map((item) => {
-                  const price = priceMap[getPriceKey(item.symbol, item.market)];
-                  const fundamental = fundamentalMap[getPriceKey(item.symbol, item.market)];
+                  const price = priceMap[priceKey(item.symbol, item.market)];
+                  const fundamental = fundamentalMap[priceKey(item.symbol, item.market)];
                   const currentPrice = price?.price;
                   const currency = getMarketCurrency(item.market, item.symbol);
                   const target = item.target_price != null && item.target_price > 0 ? item.target_price : undefined;

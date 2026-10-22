@@ -37,6 +37,11 @@ export const PortfolioSummaryCard: React.FC<PortfolioSummaryCardProps> = ({
             ({formatPercent(summary.total_profit_loss_percent)})
           </span>
         </div>
+        {summary.missing_price_count > 0 && (
+          <p className="text-xs text-slate-400 mt-2">
+            価格未取得 {summary.missing_price_count}銘柄（評価額は取得額で計算）
+          </p>
+        )}
       </div>
 
       {/* 日次損益 */}
