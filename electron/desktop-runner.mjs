@@ -3,16 +3,19 @@ import fs from 'node:fs';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import process from 'node:process';
+import { startSyncRelay } from './sync-relay.mjs';
 
 const mode = process.argv[2] === 'start' ? 'start' : 'dev';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const webScript = mode === 'start' ? 'start' : 'dev';
 const basePort = Number(process.env.DESKTOP_PORT || 3001);
 const maxPortScan = 20;
+const syncPort = Number(process.env.PM_SYNC_PORT || 38400);
 
 let webProcess;
 let electronProcess;
 let shuttingDown = false;
+let syncRelay;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -35,43 +38,17 @@ const isPortAvailable = async (port) =>
     server.once('listening', () => {
       server.close(() => resolve(true));
     });
-    server.listen(port);
+    server.listen(port, '127.0.0.1');
   });
 
 const findAvailablePort = async (startPort, maxScan) => {
   for (let offset = 0; offset < maxScan; offset += 1) {
     const port = startPort + offset;
+    if (port === syncPort) continue;
     const available = await isPortAvailable(port);
     if (available) return port;
   }
   throw new Error(`No available port found in range ${startPort}-${startPort + maxScan - 1}`);
-};
-
-const isPortfolioManagerServer = async (url) => {
-  try {
-    const response = await fetch(`${url}/api/portfolio-data`, {
-      signal: AbortSignal.timeout(1500),
-    });
-    if (!response.ok) return false;
-    const data = await response.json();
-    return (
-      Array.isArray(data?.portfolios) &&
-      Array.isArray(data?.holdings) &&
-      Array.isArray(data?.transactions)
-    );
-  } catch {
-    return false;
-  }
-};
-
-const findExistingServerPort = async (startPort, maxScan) => {
-  for (let offset = 0; offset < maxScan; offset += 1) {
-    const port = startPort + offset;
-    const url = `http://localhost:${port}`;
-    const available = await isPortfolioManagerServer(url);
-    if (available) return port;
-  }
-  return null;
 };
 
 const runCommand = (command) =>
@@ -107,6 +84,7 @@ const terminateProcessTree = (child) => {
 const shutdown = (exitCode = 0) => {
   if (shuttingDown) return;
   shuttingDown = true;
+  syncRelay?.close().catch((error) => console.error('[sync-relay] Failed to close:', error));
   terminateProcessTree(electronProcess);
   terminateProcessTree(webProcess);
   setTimeout(() => process.exit(exitCode), 100);
@@ -141,38 +119,42 @@ const run = async () => {
     }
   }
 
-  const existingPort = await findExistingServerPort(basePort, maxPortScan);
-  let startUrl;
-
-  if (existingPort !== null) {
-    startUrl = `http://localhost:${existingPort}`;
-    console.log(`[desktop] Reusing existing app server on ${startUrl}`);
-  } else {
-    const port = await findAvailablePort(basePort, maxPortScan);
-    startUrl = `http://localhost:${port}`;
-
-    console.log(`[desktop] Starting Next.js (${webScript}) on ${startUrl}`);
-    webProcess = spawn(`${npmCommand} run ${webScript} -- -p ${port}`, {
-      stdio: 'inherit',
-      shell: true,
-      env: createChildEnv(),
-      windowsHide: false,
+  const port = await findAvailablePort(basePort, maxPortScan);
+  const startUrl = `http://127.0.0.1:${port}`;
+  try {
+    syncRelay = await startSyncRelay({
+      listenPort: syncPort,
+      targetOrigin: startUrl,
+      log: (message) => console.info(message),
     });
-
-    webProcess.on('exit', (code) => {
-      if (shuttingDown) return;
-      console.error(`[desktop] Web process exited (code: ${code ?? 1})`);
-      shutdown(code ?? 1);
-    });
-
-    await waitForServer(startUrl);
+  } catch (error) {
+    console.warn(`[sync-relay] 同期ポート ${syncPort} を使用できないため、LAN同期を無効にします: ${error.message}`);
   }
+  const publicSyncPort = syncRelay ? String(syncRelay.port) : '';
+  const syncEnv = { PM_SYNC_PORT: publicSyncPort, PM_SYNC_PUBLIC_PORT: publicSyncPort };
+
+  console.log(`[desktop] Starting Next.js (${webScript}) on ${startUrl}`);
+  webProcess = spawn(`${npmCommand} run ${webScript} -- --hostname 127.0.0.1 -p ${port}`, {
+    stdio: 'inherit',
+    shell: true,
+    env: createChildEnv(syncEnv),
+    windowsHide: false,
+  });
+
+  webProcess.on('exit', (code) => {
+    if (shuttingDown) return;
+    console.error(`[desktop] Web process exited (code: ${code ?? 1})`);
+    shutdown(code ?? 1);
+  });
+
+  await waitForServer(startUrl);
 
   console.log('[desktop] Launching Electron...');
 
   electronProcess = spawn(process.execPath, ['electron/run-electron.mjs'], {
     stdio: 'inherit',
     env: createChildEnv({
+      ...syncEnv,
       ELECTRON_START_URL: startUrl,
     }),
     windowsHide: false,

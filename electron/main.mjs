@@ -3,14 +3,17 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { createServer } from 'node:net';
 import path from 'node:path';
+import { startSyncRelay } from './sync-relay.mjs';
 
 const { app, BrowserWindow, shell } = electron;
 
 const START_URL = process.env.ELECTRON_START_URL;
 const packagedBasePort = Number(process.env.DESKTOP_PORT || 38400);
 const maxPortScan = 30;
+const syncPort = Number(process.env.PM_SYNC_PORT || 38400);
 
 let serverProcess;
+let syncRelay;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -39,6 +42,7 @@ const isPortAvailable = async (port) =>
 const findAvailablePort = async () => {
   for (let offset = 0; offset < maxPortScan; offset += 1) {
     const port = packagedBasePort + offset;
+    if (port === syncPort) continue;
     if (await isPortAvailable(port)) return port;
   }
   throw new Error(`No available port found in range ${packagedBasePort}-${packagedBasePort + maxPortScan - 1}`);
@@ -81,6 +85,18 @@ const startBundledServer = async () => {
   const startUrl = `http://127.0.0.1:${port}`;
   const logPath = path.join(app.getPath('userData'), 'next-server.log');
   const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+  try {
+    syncRelay = await startSyncRelay({
+      listenPort: syncPort,
+      targetOrigin: startUrl,
+      log: (message) => logStream.write(`${message}\n`),
+    });
+  } catch (error) {
+    const warning = `[sync-relay] 同期ポート ${syncPort} を使用できないため、LAN同期を無効にします: ${error.message}`;
+    logStream.write(`${warning}\n`);
+    console.warn(warning);
+  }
+  const publicSyncPort = syncRelay ? String(syncRelay.port) : '';
   const nodeArgs = [
     '--require',
     readlinkPatch,
@@ -97,6 +113,8 @@ const startBundledServer = async () => {
     env: createChildEnv({
       NODE_ENV: 'production',
       SQLITE_DB_PATH: dbPath,
+      PM_SYNC_PORT: publicSyncPort,
+      PM_SYNC_PUBLIC_PORT: publicSyncPort,
     }),
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
@@ -148,10 +166,14 @@ app.whenReady().then(async () => {
       createWindow(startUrl);
     }
   });
+}).catch((error) => {
+  console.error('[desktop] Failed to start bundled app:', error);
+  app.quit();
 });
 
 app.on('before-quit', () => {
   app.isQuitting = true;
+  syncRelay?.close().catch((error) => console.error('[sync-relay] Failed to close:', error));
   if (serverProcess && serverProcess.exitCode === null) {
     serverProcess.kill();
   }

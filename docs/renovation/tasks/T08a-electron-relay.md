@@ -1,6 +1,7 @@
 # T08a LAN同期：Electron の同期専用中継サーバー
 
-まず `docs/renovation/AGENT_RULES.md` と `docs/renovation/PLAN.md`、`docs/renovation/tasks/T07-sync-engine.md` の「ネットワーク構成」を読むこと。T07 の後に行う。
+まず `docs/renovation/AGENT_RULES.md` と `docs/renovation/PLAN.md`、`docs/renovation/tasks/T07-sync-engine.md` の「ネットワーク構成」を読むこと。
+**T07（同期エンジンとAPI）を別のエージェントが同時に実装している。`electron/` と `README.md` 以外には触れず、`git status` に出る他の変更は無視すること。`npm run build`・`npm run desktop:start`・`next start` は実行しないこと（ビルドが衝突するため。結合確認はレビュー担当が行う）。**
 
 ## 目的
 Next.js サーバーを LAN に公開せず、相手PCからの同期リクエスト（`/api/sync/peer/*`）だけを LAN から受け付ける小さな中継サーバーを Electron 側に作る。これで画面用のAPI（全データ削除など）は LAN から一切届かない。
@@ -33,7 +34,7 @@ Next.js サーバーを LAN に公開せず、相手PCからの同期リクエ�
 ## 確認
 - `npm run lint`、`npx tsc --noEmit`
 - `node` で中継サーバー単体を起動する一時スクリプトを書き、転送されるパス／されないパス、`X-Forwarded-For` の上書き、本文サイズ上限、転送先停止時の 502 を確認する（確認後スクリプトは削除）。
-- 可能なら `npm run desktop:start` で起動し、`http://<このPCのLAN IP>:38400/api/sync/peer/ping` に署名なしでアクセスして 401（Next.js 側の署名検証）になること、`/api/portfolio-data` が 404 になることを確認する。
+- 中継サーバー単体の確認では、転送先に `node:http` で作った簡易サーバー（一時スクリプト内）を使う。
 
 ## レポート
 `docs/renovation/reports/T08a.md` に AGENT_RULES.md の形式で書く。
