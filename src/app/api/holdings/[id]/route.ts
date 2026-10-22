@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteHoldingById, updateHoldingById } from '@/lib/sqlite';
+import { deleteHoldingById, updateHoldingById } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

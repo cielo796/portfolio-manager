@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { mockNews } from '@/lib/mock-data';
-import { listHoldings, listNewsItems, upsertNewsItems } from '@/lib/sqlite';
+import { listHoldings, listNewsItems, upsertNewsItems } from '@/lib/db';
 import { Holding, NewsItem } from '@/types';
 
 export const dynamic = 'force-dynamic';

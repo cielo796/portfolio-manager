@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { updateHoldingsOrder } from '@/lib/sqlite';
+import { updateHoldingsOrder } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

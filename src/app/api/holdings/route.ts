@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createHolding } from '@/lib/sqlite';
+import { createHolding } from '@/lib/db';
 import { Market } from '@/types';
 
 export const dynamic = 'force-dynamic';

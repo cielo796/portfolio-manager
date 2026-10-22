@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteWatchlistItemById, updateWatchlistItemById } from '@/lib/sqlite';
+import { deleteWatchlistItemById, updateWatchlistItemById } from '@/lib/db';
 import { WatchlistKey } from '@/types';
 
 export const dynamic = 'force-dynamic';

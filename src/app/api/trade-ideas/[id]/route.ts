@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteTradeIdeaById, updateTradeIdeaById } from '@/lib/sqlite';
+import { deleteTradeIdeaById, updateTradeIdeaById } from '@/lib/db';
 import { Market } from '@/types';
 
 export const dynamic = 'force-dynamic';

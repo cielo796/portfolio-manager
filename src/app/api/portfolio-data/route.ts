@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listHoldings, listNewsItems, listPortfolios, listStockPrices, listTransactions } from '@/lib/sqlite';
+import { listHoldings, listNewsItems, listPortfolios, listStockPrices, listTransactions } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

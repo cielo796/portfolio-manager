@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createWatchlistItem, listWatchlistItems } from '@/lib/sqlite';
+import { createWatchlistItem, listWatchlistItems } from '@/lib/db';
 import { Market, WatchlistKey } from '@/types';
 
 export const dynamic = 'force-dynamic';

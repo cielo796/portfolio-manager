@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Market, StockPrice } from '@/types';
 import { getMarketCurrency } from '@/lib/utils';
-import { listStockPrices, upsertStockPrices } from '@/lib/sqlite';
+import { listStockPrices, upsertStockPrices } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
