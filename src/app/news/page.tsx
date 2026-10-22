@@ -8,7 +8,7 @@ import { NewsList } from '@/components/news-list';
 import { RefreshCw, Filter } from 'lucide-react';
 
 export default function NewsPage() {
-  const { holdings, news, isLoading } = usePortfolio();
+  const { holdings, news, isLoading, isRefreshingNews, refreshNews } = usePortfolio();
   const [selectedSymbol, setSelectedSymbol] = useState<string>('all');
 
   // ユニークな銘柄リストを取得
@@ -36,6 +36,14 @@ export default function NewsPage() {
             保有銘柄に関連する最新ニュース
           </p>
         </div>
+        <Button
+          variant="secondary"
+          onClick={refreshNews}
+          disabled={isRefreshingNews}
+        >
+          <RefreshCw className={`w-4 h-4 ${isRefreshingNews ? 'animate-spin' : ''}`} />
+          ニュース更新
+        </Button>
       </div>
 
       {/* フィルター */}

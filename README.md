@@ -94,6 +94,12 @@ portfolio-manager/
 cp .env.example .env.local
 ```
 
+ニュースAPI連携を有効にする場合は、Alpha Vantage のAPIキーを設定してください。
+
+```env
+ALPHA_VANTAGE_API_KEY=your_api_key_here
+```
+
 ### SQLite（デフォルト）
 
 - データは `data/portfolio.db` に保存されます
@@ -113,8 +119,8 @@ cp .env.example .env.local
 - [ ] 手動価格更新
 
 ### Phase 3（予定）
-- [ ] ニュースAPI連携（Finnhub）
-- [ ] ニュース自動取得
+- [x] ニュースAPI連携（Alpha Vantage / APIキー未設定時はモック）
+- [x] 手動更新ボタンによる保有銘柄ベースのニュース一括取得
 - [ ] 重要ニュースハイライト
 
 ### Phase 4（予定）

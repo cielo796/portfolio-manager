@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Market, StockPrice } from '@/types';
 import { getMarketCurrency } from '@/lib/utils';
+import { listStockPrices, upsertStockPrices } from '@/lib/sqlite';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,52 +21,92 @@ const isValidMarket = (market: unknown): market is Market =>
 
 const normalizeSymbol = (symbol: string) => symbol.toUpperCase().trim();
 
-const toStooqSymbol = (symbol: string, market: Market) => {
+const toYahooSymbol = (symbol: string, market: Market) => {
   const normalized = normalizeSymbol(symbol);
-  if (market === 'US') return `${normalized.toLowerCase()}.us`;
-  if (market === 'JP') return `${normalized.toLowerCase()}.jp`;
-  return normalized.replace(/[^A-Z]/g, '').toLowerCase();
+  if (market === 'US') return normalized;
+  if (market === 'JP') {
+    if (normalized.endsWith('.T')) return normalized;
+    if (normalized.endsWith('.JP')) return `${normalized.slice(0, -3)}.T`;
+    return `${normalized}.T`;
+  }
+
+  if (normalized.endsWith('=X')) return normalized;
+
+  const pair = normalized.replace(/[^A-Z]/g, '');
+  return pair.length === 6 ? `${pair}=X` : normalized;
 };
 
-type StooqQuote = {
-  close: number;
-  open?: number;
-};
-
-const parseStooqLine = (line: string): StooqQuote | null => {
-  const parts = line.trim().split(',');
-  if (parts.length < 7) return null;
-  if (parts[0] === 'N/D') return null;
-
-  const open = Number(parts[3]);
-  const close = Number(parts[6]);
-
-  if (!Number.isFinite(close) || close <= 0) return null;
-
-  return {
-    close,
-    open: Number.isFinite(open) && open > 0 ? open : undefined,
+type YahooChartResponse = {
+  chart?: {
+    result?: Array<{
+      meta?: {
+        regularMarketPrice?: number;
+        chartPreviousClose?: number;
+        currency?: string;
+      };
+      indicators?: {
+        quote?: Array<{
+          close?: Array<number | null>;
+        }>;
+      };
+    }>;
+    error?: unknown;
   };
 };
 
-const fetchStooqQuote = async (symbol: string, market: Market): Promise<StooqQuote | null> => {
+type YahooQuote = {
+  close: number;
+  previousClose?: number;
+};
+
+const isPositiveFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0;
+
+const getPreviousCloseFromSeries = (closes: Array<number | null> | undefined) => {
+  const validCloses = (closes ?? []).filter(isPositiveFiniteNumber);
+  if (validCloses.length < 2) return undefined;
+  return validCloses[validCloses.length - 2];
+};
+
+const parseYahooChart = (data: YahooChartResponse): YahooQuote | null => {
+  const result = data.chart?.result?.[0];
+  if (!result || data.chart?.error) return null;
+
+  const close = result.meta?.regularMarketPrice;
+  if (!isPositiveFiniteNumber(close)) return null;
+
+  const seriesPreviousClose = getPreviousCloseFromSeries(result.indicators?.quote?.[0]?.close);
+  const previousClose = seriesPreviousClose ?? (
+    isPositiveFiniteNumber(result.meta?.chartPreviousClose) ? result.meta.chartPreviousClose : undefined
+  );
+
+  return {
+    close,
+    previousClose,
+  };
+};
+
+const fetchYahooQuote = async (symbol: string, market: Market): Promise<YahooQuote | null> => {
   try {
-    const stooqSymbol = toStooqSymbol(symbol, market);
-    const response = await fetch(`https://stooq.com/q/l/?s=${encodeURIComponent(stooqSymbol)}&i=1`, {
-      cache: 'no-store',
-    });
+    const yahooSymbol = toYahooSymbol(symbol, market);
+    const url = new URL(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}`);
+    url.searchParams.set('range', '5d');
+    url.searchParams.set('interval', '1d');
+
+    const response = await fetch(url, { cache: 'no-store' });
 
     if (!response.ok) return null;
 
-    const text = await response.text();
-    const firstLine = text.split('\n').find((line) => line.trim() !== '');
-    if (!firstLine) return null;
-
-    return parseStooqLine(firstLine);
+    const data = (await response.json()) as YahooChartResponse;
+    return parseYahooChart(data);
   } catch {
     return null;
   }
 };
+
+export async function GET() {
+  return NextResponse.json({ prices: listStockPrices() });
+}
 
 export async function POST(request: Request) {
   let body: PriceRequest;
@@ -99,11 +140,11 @@ export async function POST(request: Request) {
   const now = new Date().toISOString();
   const priceEntries = await Promise.all(
     Array.from(unique.values()).map(async (item) => {
-      const quote = await fetchStooqQuote(item.symbol, item.market);
+      const quote = await fetchYahooQuote(item.symbol, item.market);
       if (!quote) return null;
 
-      const change = quote.open !== undefined ? quote.close - quote.open : 0;
-      const changePercent = quote.open !== undefined ? (change / quote.open) * 100 : 0;
+      const change = quote.previousClose !== undefined ? quote.close - quote.previousClose : 0;
+      const changePercent = quote.previousClose !== undefined ? (change / quote.previousClose) * 100 : 0;
       const currency = getMarketCurrency(item.market, item.symbol);
       const label =
         item.name?.trim() ||
@@ -127,6 +168,7 @@ export async function POST(request: Request) {
   );
 
   const prices = Object.fromEntries(priceEntries.filter((entry): entry is readonly [string, StockPrice] => entry !== null));
+  upsertStockPrices(Object.values(prices));
 
   return NextResponse.json({
     prices,

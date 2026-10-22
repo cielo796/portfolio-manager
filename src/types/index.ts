@@ -1,5 +1,6 @@
 // 市場タイプ
 export type Market = 'US' | 'JP' | 'FX';
+export type WatchlistKey = 'main' | 'sub1' | 'sub2' | 'sub3' | 'sub4';
 
 // 取引タイプ
 export type TransactionType = 'buy' | 'sell' | 'dividend';
@@ -23,6 +24,7 @@ export interface Holding {
   market: Market;
   shares: number;
   avg_cost: number;
+  sort_order: number;
   sector?: string;
   memo?: string;
   created_at: string;
@@ -57,6 +59,36 @@ export interface StockPrice {
   updated_at: string;
 }
 
+// 財務・バリュエーション指標
+export interface FundamentalMetrics {
+  symbol: string;
+  market: Market;
+  currency?: string;
+  updated_at: string;
+  source: 'yahoo_finance' | 'yahoo_finance_nasdaq';
+  market_cap?: number;
+  trailing_pe?: number;
+  forward_pe?: number;
+  pbr?: number;
+  psr?: number;
+  revenue?: number;
+  operating_margin?: number;
+  net_margin?: number;
+  roe?: number;
+  roa?: number;
+  revenue_growth?: number;
+  operating_income_growth?: number;
+  eps_growth?: number;
+  equity_ratio?: number;
+  interest_bearing_debt?: number;
+  net_cash?: number;
+  free_cash_flow?: number;
+  dividend_yield?: number;
+  payout_ratio?: number;
+  share_buyback?: number;
+  next_earnings_date?: string;
+}
+
 // 為替レート
 export interface ExchangeRate {
   pair: string;
@@ -81,7 +113,12 @@ export interface NewsItem {
 export interface WatchlistItem {
   id: string;
   symbol: string;
+  name?: string;
   market: Market;
+  list_key: WatchlistKey;
+  sort_order: number;
+  /** セクターキー（@/lib/sectors の SectorKey） */
+  sector?: string;
   target_price?: number;
   memo?: string;
   created_at: string;
@@ -138,6 +175,16 @@ export interface PortfolioSummary {
 // セクター配分
 export interface SectorAllocation {
   sector: string;
+  value: number;
+  percent: number;
+  color: string;
+}
+
+// 銘柄別配分
+export interface HoldingAllocation {
+  symbol: string;
+  name?: string;
+  market: Market;
   value: number;
   percent: number;
   color: string;

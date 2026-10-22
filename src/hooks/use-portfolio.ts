@@ -10,7 +10,8 @@ import {
   ExchangeRate,
   Transaction,
   PortfolioSummary,
-  SectorAllocation
+  SectorAllocation,
+  HoldingAllocation
 } from '@/types';
 import { 
   mockPortfolios, 
@@ -23,6 +24,20 @@ import { getMarketCurrency, SECTOR_COLORS } from '@/lib/utils';
 
 const isCashHolding = (holding: Holding | HoldingWithPrice) => holding.symbol === 'CASH';
 const isFxHolding = (holding: Holding | HoldingWithPrice) => holding.market === 'FX';
+const HOLDING_ALLOCATION_COLORS = [
+  '#38bdf8',
+  '#22c55e',
+  '#f472b6',
+  '#60a5fa',
+  '#a78bfa',
+  '#f59e0b',
+  '#14b8a6',
+  '#ef4444',
+  '#eab308',
+  '#94a3b8',
+  '#fb7185',
+  '#2dd4bf',
+];
 
 export const usePortfolio = () => {
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
@@ -33,6 +48,24 @@ export const usePortfolio = () => {
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate>(mockExchangeRate);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRefreshingNews, setIsRefreshingNews] = useState(false);
+
+  const refreshNews = useCallback(async () => {
+    setIsRefreshingNews(true);
+    try {
+      const response = await fetch('/api/news?refresh=1', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error('failed_to_load_news');
+      }
+
+      const data = (await response.json()) as { news?: NewsItem[] };
+      setNews(Array.isArray(data.news) ? data.news : mockNews);
+    } catch {
+      setNews((prev) => (prev.length > 0 ? prev : mockNews));
+    } finally {
+      setIsRefreshingNews(false);
+    }
+  }, []);
 
   const loadPortfolioData = useCallback(async () => {
     setIsLoading(true);
@@ -42,18 +75,41 @@ export const usePortfolio = () => {
         throw new Error('failed_to_load');
       }
 
-      const data = await response.json() as { portfolios: Portfolio[]; holdings: Holding[]; transactions: Transaction[] };
+      const data = await response.json() as {
+        portfolios: Portfolio[];
+        holdings: Holding[];
+        transactions: Transaction[];
+        stockPrices?: Record<string, StockPrice>;
+        news?: NewsItem[];
+      };
+      const savedStockPrices = data.stockPrices ?? {};
+      const nextStockPrices = {
+        ...mockStockPrices,
+        ...savedStockPrices,
+      };
+      const usdJpyRate = nextStockPrices.USDJPY?.price;
+
       setPortfolios(data.portfolios ?? []);
       setHoldings(data.holdings ?? []);
       setTransactions(data.transactions ?? []);
+      setStockPrices(nextStockPrices);
+      setNews(Array.isArray(data.news) && data.news.length > 0 ? data.news : mockNews);
+      if (usdJpyRate && Number.isFinite(usdJpyRate) && usdJpyRate > 0) {
+        setExchangeRate((prev) => ({
+          ...prev,
+          rate: usdJpyRate,
+          updated_at: nextStockPrices.USDJPY?.updated_at ?? prev.updated_at,
+        }));
+      }
     } catch {
       // API未起動時などのフォールバック
       setPortfolios(mockPortfolios);
       setHoldings(mockHoldings);
       setTransactions([]);
-    } finally {
       setStockPrices(mockStockPrices);
       setNews(mockNews);
+      setExchangeRate(mockExchangeRate);
+    } finally {
       setIsLoading(false);
     }
   }, []);
@@ -241,8 +297,41 @@ export const usePortfolio = () => {
     color: SECTOR_COLORS[sector] || SECTOR_COLORS['その他'],
   }));
 
+  // 銘柄別配分計算
+  const holdingAllocation: HoldingAllocation[] = Array.from(
+    holdingsWithPrices
+      .reduce((acc, holding) => {
+        const key = `${holding.symbol}|${holding.market}`;
+        const current = acc.get(key);
+        const value = holding.current_value_jpy ?? 0;
+
+        if (current) {
+          current.value += value;
+          return acc;
+        }
+
+        acc.set(key, {
+          symbol: holding.symbol,
+          name: holding.name,
+          market: holding.market,
+          value,
+          percent: 0,
+          color: '',
+        });
+        return acc;
+      }, new Map<string, HoldingAllocation>())
+      .values()
+  )
+    .filter((item) => Number.isFinite(item.value) && item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .map((item, index) => ({
+      ...item,
+      percent: summary.total_value_jpy > 0 ? (item.value / summary.total_value_jpy) * 100 : 0,
+      color: HOLDING_ALLOCATION_COLORS[index % HOLDING_ALLOCATION_COLORS.length],
+    }));
+
   // 銘柄追加
-  const addHolding = useCallback(async (holding: Omit<Holding, 'id' | 'created_at' | 'updated_at'>) => {
+  const addHolding = useCallback(async (holding: Omit<Holding, 'id' | 'created_at' | 'updated_at' | 'sort_order'>) => {
     const response = await fetch('/api/holdings', {
       method: 'POST',
       headers: {
@@ -307,6 +396,49 @@ export const usePortfolio = () => {
     setHoldings((prev) => prev.map((h) => (h.id === id ? data.holding : h)));
   }, []);
 
+  const reorderHoldings = useCallback(async (orderedHoldingIds: string[]) => {
+    const orderedIdSet = new Set(orderedHoldingIds);
+    const holdingsById = new Map(holdings.map((holding) => [holding.id, holding]));
+    const orderedHoldings = orderedHoldingIds
+      .map((id) => holdingsById.get(id))
+      .filter((holding): holding is Holding => Boolean(holding));
+
+    if (orderedHoldings.length === 0) return;
+
+    const remainingHoldings = holdings.filter((holding) => !orderedIdSet.has(holding.id));
+    const nextHoldings = [...orderedHoldings, ...remainingHoldings].map((holding, index) => ({
+      ...holding,
+      sort_order: index,
+    }));
+
+    setHoldings(nextHoldings);
+
+    try {
+      const response = await fetch('/api/holdings/reorder', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: nextHoldings.map((holding) => ({
+            id: holding.id,
+            sort_order: holding.sort_order,
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('failed_to_reorder_holdings');
+      }
+
+      const data = await response.json() as { holdings?: Holding[] };
+      setHoldings(data.holdings ?? nextHoldings);
+    } catch {
+      setHoldings(holdings);
+      throw new Error('failed_to_reorder_holdings');
+    }
+  }, [holdings]);
+
   return {
     portfolios,
     holdings: holdingsWithPrices,
@@ -316,13 +448,17 @@ export const usePortfolio = () => {
     exchangeRate,
     summary,
     sectorAllocation,
+    holdingAllocation,
     isLoading,
     isRefreshing,
+    isRefreshingNews,
     refreshPrices,
+    refreshNews,
     addHolding,
     addTransaction,
     removeHolding,
     updateHolding,
+    reorderHoldings,
   };
 };
 

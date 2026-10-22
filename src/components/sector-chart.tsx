@@ -9,6 +9,15 @@ interface SectorChartProps {
   data: SectorAllocation[];
 }
 
+type PieLabelProps = {
+  cx?: number;
+  cy?: number;
+  midAngle?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  payload?: SectorAllocation;
+};
+
 const CustomTooltip: React.FC<{
   active?: boolean;
   payload?: { payload: SectorAllocation }[];
@@ -28,10 +37,28 @@ const CustomTooltip: React.FC<{
 };
 
 export const SectorChart: React.FC<SectorChartProps> = ({ data }) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderCustomLabel = (props: any) => {
-    const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;
-    if (!percent || percent < 0.05) return null;
+  const positiveData = data.filter((item) => Number.isFinite(item.value) && item.value > 0);
+  const chartTotal = positiveData.reduce((sum, item) => sum + item.value, 0);
+  const chartData = positiveData
+    .map((item) => ({
+      ...item,
+      percent: chartTotal > 0 ? (item.value / chartTotal) * 100 : 0,
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  const renderCustomLabel = (props: PieLabelProps) => {
+    const { cx, cy, midAngle, innerRadius, outerRadius, payload } = props;
+    if (
+      cx === undefined ||
+      cy === undefined ||
+      midAngle === undefined ||
+      innerRadius === undefined ||
+      outerRadius === undefined ||
+      !payload ||
+      payload.percent < 5
+    ) {
+      return null;
+    }
     
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -47,17 +74,25 @@ export const SectorChart: React.FC<SectorChartProps> = ({ data }) => {
         dominantBaseline="central"
         className="text-xs font-medium"
       >
-        {`${(percent * 100).toFixed(0)}%`}
+        {`${payload.percent.toFixed(1)}%`}
       </text>
     );
   };
+
+  if (chartData.length === 0) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-sm text-slate-500">
+        表示できる配分データがありません
+      </div>
+    );
+  }
 
   return (
     <div className="h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
-            data={data}
+            data={chartData}
             cx="50%"
             cy="50%"
             labelLine={false}
@@ -65,10 +100,11 @@ export const SectorChart: React.FC<SectorChartProps> = ({ data }) => {
             outerRadius={100}
             innerRadius={60}
             dataKey="value"
+            nameKey="sector"
             strokeWidth={2}
             stroke="#1e293b"
           >
-            {data.map((entry, index) => (
+            {chartData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Pie>

@@ -4,12 +4,35 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { mockHoldings, mockPortfolios, mockTransactions } from '@/lib/mock-data';
-import { Holding, Portfolio, TickerPreset, TradeIdea, Transaction, TransactionType, WatchlistItem } from '@/types';
+import { normalizeSectorKey, resolveSectorForSymbol } from '@/lib/sectors';
+import {
+  Holding,
+  NewsItem,
+  Portfolio,
+  StockPrice,
+  TickerPreset,
+  TradeIdea,
+  Transaction,
+  TransactionType,
+  WatchlistItem,
+  WatchlistKey,
+} from '@/types';
 
 type PortfolioBackup = Pick<Portfolio, 'id' | 'name' | 'broker' | 'description' | 'created_at' | 'updated_at'>;
 type HoldingBackup = Pick<
   Holding,
-  'id' | 'portfolio_id' | 'symbol' | 'name' | 'market' | 'shares' | 'avg_cost' | 'sector' | 'memo' | 'created_at' | 'updated_at'
+  | 'id'
+  | 'portfolio_id'
+  | 'symbol'
+  | 'name'
+  | 'market'
+  | 'shares'
+  | 'avg_cost'
+  | 'sort_order'
+  | 'sector'
+  | 'memo'
+  | 'created_at'
+  | 'updated_at'
 >;
 type TransactionBackup = Pick<
   Transaction,
@@ -29,7 +52,17 @@ type TransactionBackup = Pick<
 type TradeIdeaBackup = Pick<TradeIdea, 'id' | 'symbol' | 'market' | 'note' | 'created_at' | 'updated_at'>;
 type WatchlistItemBackup = Pick<
   WatchlistItem,
-  'id' | 'symbol' | 'market' | 'target_price' | 'memo' | 'created_at' | 'updated_at'
+  | 'id'
+  | 'symbol'
+  | 'name'
+  | 'market'
+  | 'list_key'
+  | 'sort_order'
+  | 'sector'
+  | 'target_price'
+  | 'memo'
+  | 'created_at'
+  | 'updated_at'
 >;
 type TickerPresetBackup = Pick<TickerPreset, 'id' | 'symbol' | 'market' | 'name' | 'created_at' | 'updated_at'>;
 
@@ -47,6 +80,7 @@ const defaultDbPath = path.join(process.cwd(), 'data', 'portfolio.db');
 const DB_PATH = configuredDbPath ? path.resolve(process.cwd(), configuredDbPath) : defaultDbPath;
 const DATA_DIR = path.dirname(DB_PATH);
 const MARKET_VALUES = ['US', 'JP', 'FX'] as const;
+const WATCHLIST_KEYS = ['main', 'sub1', 'sub2', 'sub3', 'sub4'] as const;
 
 type GlobalWithDb = typeof globalThis & {
   __portfolioDb?: Database.Database;
@@ -57,6 +91,8 @@ const globalWithDb = globalThis as GlobalWithDb;
 
 const isValidMarket = (market: string): market is Holding['market'] =>
   MARKET_VALUES.includes(market as (typeof MARKET_VALUES)[number]);
+const isValidWatchlistKey = (value: string): value is WatchlistKey =>
+  WATCHLIST_KEYS.includes(value as WatchlistKey);
 
 function getDb(): Database.Database {
   if (!globalWithDb.__portfolioDb) {
@@ -92,6 +128,7 @@ function initialize(db: Database.Database) {
       market TEXT NOT NULL CHECK (market IN ('US', 'JP', 'FX')),
       shares REAL NOT NULL CHECK (shares > 0),
       avg_cost REAL NOT NULL CHECK (avg_cost >= 0),
+      sort_order INTEGER NOT NULL DEFAULT 0,
       sector TEXT,
       memo TEXT,
       created_at TEXT NOT NULL,
@@ -125,12 +162,41 @@ function initialize(db: Database.Database) {
     CREATE TABLE IF NOT EXISTS watchlist_items (
       id TEXT PRIMARY KEY,
       symbol TEXT NOT NULL,
+      name TEXT,
       market TEXT NOT NULL CHECK (market IN ('US', 'JP', 'FX')),
+      list_key TEXT NOT NULL DEFAULT 'main' CHECK (list_key IN ('main', 'sub1', 'sub2', 'sub3', 'sub4')),
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      sector TEXT,
       target_price REAL CHECK (target_price IS NULL OR target_price > 0),
       memo TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       UNIQUE(symbol, market)
+    );
+
+    CREATE TABLE IF NOT EXISTS stock_prices (
+      symbol TEXT NOT NULL,
+      market TEXT NOT NULL CHECK (market IN ('US', 'JP', 'FX')),
+      name TEXT NOT NULL,
+      price REAL NOT NULL,
+      change REAL NOT NULL,
+      change_percent REAL NOT NULL,
+      currency TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (symbol, market)
+    );
+
+    CREATE TABLE IF NOT EXISTS news_items (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT,
+      source TEXT NOT NULL,
+      url TEXT NOT NULL,
+      image_url TEXT,
+      published_at TEXT NOT NULL,
+      sentiment TEXT CHECK (sentiment IS NULL OR sentiment IN ('positive', 'negative', 'neutral')),
+      UNIQUE(symbol, url)
     );
 
     CREATE TABLE IF NOT EXISTS ticker_presets (
@@ -145,17 +211,27 @@ function initialize(db: Database.Database) {
   `);
 
   ensureFxMarketSupport(db);
+  ensureHoldingsOrderSupport(db);
+  ensureWatchlistLayoutSupport(db);
+  ensureWatchlistNameSupport(db);
+  ensureWatchlistSectorSupport(db);
 
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_holdings_portfolio ON holdings(portfolio_id);
     CREATE INDEX IF NOT EXISTS idx_holdings_symbol ON holdings(symbol);
+    CREATE INDEX IF NOT EXISTS idx_holdings_sort_order ON holdings(sort_order);
     CREATE INDEX IF NOT EXISTS idx_transactions_portfolio ON transactions(portfolio_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_symbol ON transactions(symbol);
     CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(transaction_date);
     CREATE INDEX IF NOT EXISTS idx_trade_ideas_symbol ON trade_ideas(symbol);
     CREATE INDEX IF NOT EXISTS idx_trade_ideas_created_at ON trade_ideas(created_at);
     CREATE INDEX IF NOT EXISTS idx_watchlist_symbol ON watchlist_items(symbol);
+    CREATE INDEX IF NOT EXISTS idx_watchlist_layout ON watchlist_items(list_key, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_watchlist_sector ON watchlist_items(sector);
     CREATE INDEX IF NOT EXISTS idx_watchlist_created_at ON watchlist_items(created_at);
+    CREATE INDEX IF NOT EXISTS idx_stock_prices_updated_at ON stock_prices(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_news_items_published_at ON news_items(published_at);
+    CREATE INDEX IF NOT EXISTS idx_news_items_symbol ON news_items(symbol);
     CREATE INDEX IF NOT EXISTS idx_ticker_presets_symbol ON ticker_presets(symbol);
     CREATE INDEX IF NOT EXISTS idx_ticker_presets_created_at ON ticker_presets(created_at);
   `);
@@ -257,6 +333,108 @@ function ensureFxMarketSupport(db: Database.Database) {
   db.pragma('foreign_keys = ON');
 }
 
+function ensureHoldingsOrderSupport(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(holdings)').all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((column) => column.name));
+
+  if (!columnNames.has('sort_order')) {
+    db.exec('ALTER TABLE holdings ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+    const rows = db
+      .prepare('SELECT id FROM holdings ORDER BY created_at ASC')
+      .all() as Array<{ id: string }>;
+    const update = db.prepare('UPDATE holdings SET sort_order = ? WHERE id = ?');
+    const tx = db.transaction(() => {
+      rows.forEach((row, index) => update.run(index, row.id));
+    });
+    tx();
+  }
+}
+
+function ensureWatchlistLayoutSupport(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(watchlist_items)').all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((column) => column.name));
+
+  if (!columnNames.has('list_key')) {
+    db.exec("ALTER TABLE watchlist_items ADD COLUMN list_key TEXT NOT NULL DEFAULT 'main'");
+  }
+
+  if (!columnNames.has('sort_order')) {
+    db.exec('ALTER TABLE watchlist_items ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+    const rows = db
+      .prepare('SELECT id FROM watchlist_items ORDER BY created_at DESC')
+      .all() as Array<{ id: string }>;
+    const update = db.prepare('UPDATE watchlist_items SET sort_order = ? WHERE id = ?');
+    const tx = db.transaction(() => {
+      rows.forEach((row, index) => update.run(index, row.id));
+    });
+    tx();
+  }
+
+  db.prepare(
+    `
+      UPDATE watchlist_items
+      SET list_key = 'main'
+      WHERE list_key IS NULL OR list_key NOT IN ('main', 'sub1', 'sub2', 'sub3', 'sub4')
+    `
+  ).run();
+}
+
+function ensureWatchlistNameSupport(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(watchlist_items)').all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((column) => column.name));
+
+  if (!columnNames.has('name')) {
+    db.exec('ALTER TABLE watchlist_items ADD COLUMN name TEXT');
+  }
+
+  db.prepare(`
+    UPDATE watchlist_items
+    SET name = COALESCE(
+      (
+        SELECT NULLIF(TRIM(ticker_presets.name), '')
+        FROM ticker_presets
+        WHERE ticker_presets.symbol = watchlist_items.symbol
+          AND ticker_presets.market = watchlist_items.market
+        LIMIT 1
+      ),
+      (
+        SELECT NULLIF(TRIM(holdings.name), '')
+        FROM holdings
+        WHERE holdings.symbol = watchlist_items.symbol
+          AND holdings.market = watchlist_items.market
+        LIMIT 1
+      )
+    )
+    WHERE market = 'JP' AND (name IS NULL OR TRIM(name) = '')
+  `).run();
+}
+
+function ensureWatchlistSectorSupport(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(watchlist_items)').all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((column) => column.name));
+
+  if (!columnNames.has('sector')) {
+    db.exec('ALTER TABLE watchlist_items ADD COLUMN sector TEXT');
+  }
+
+  // 既存行のセクター表記を正規化し、未設定の米国株はマスタから自動補完する
+  const rows = db
+    .prepare('SELECT id, symbol, market, sector FROM watchlist_items')
+    .all() as Array<{ id: string; symbol: string; market: string; sector: string | null }>;
+  const update = db.prepare('UPDATE watchlist_items SET sector = ? WHERE id = ?');
+
+  const tx = db.transaction(() => {
+    for (const row of rows) {
+      const current = row.sector?.trim() ?? '';
+      const next = current
+        ? normalizeSectorKey(current)
+        : resolveSectorForSymbol(row.symbol, row.market);
+      if (next !== current) update.run(next, row.id);
+    }
+  });
+  tx();
+}
+
 function seedIfEmpty(db: Database.Database) {
   const portfolioCount = db.prepare('SELECT COUNT(*) as count FROM portfolios').get() as { count: number };
   if (portfolioCount.count > 0) return;
@@ -266,8 +444,8 @@ function seedIfEmpty(db: Database.Database) {
     VALUES (@id, @name, @broker, @description, @created_at, @updated_at)
   `);
   const insertHolding = db.prepare(`
-    INSERT INTO holdings (id, portfolio_id, symbol, name, market, shares, avg_cost, sector, memo, created_at, updated_at)
-    VALUES (@id, @portfolio_id, @symbol, @name, @market, @shares, @avg_cost, @sector, @memo, @created_at, @updated_at)
+    INSERT INTO holdings (id, portfolio_id, symbol, name, market, shares, avg_cost, sort_order, sector, memo, created_at, updated_at)
+    VALUES (@id, @portfolio_id, @symbol, @name, @market, @shares, @avg_cost, @sort_order, @sector, @memo, @created_at, @updated_at)
   `);
   const insertTransaction = db.prepare(`
     INSERT INTO transactions (id, portfolio_id, symbol, market, type, shares, price, total_amount, fees, transaction_date, memo, created_at)
@@ -310,7 +488,7 @@ export function listPortfolios(): Portfolio[] {
 
 export function listHoldings(): Holding[] {
   const db = getDb();
-  return db.prepare('SELECT * FROM holdings ORDER BY created_at ASC').all() as Holding[];
+  return db.prepare('SELECT * FROM holdings ORDER BY sort_order ASC, created_at ASC').all() as Holding[];
 }
 
 export function listTransactions(): Transaction[] {
@@ -339,9 +517,37 @@ export function listWatchlistItems(): WatchlistItem[] {
   const db = getDb();
   return db
     .prepare(`
-      SELECT *
+      SELECT
+        watchlist_items.*,
+        COALESCE(
+          NULLIF(TRIM(watchlist_items.name), ''),
+          (
+            SELECT NULLIF(TRIM(ticker_presets.name), '')
+            FROM ticker_presets
+            WHERE ticker_presets.symbol = watchlist_items.symbol
+              AND ticker_presets.market = watchlist_items.market
+            LIMIT 1
+          ),
+          (
+            SELECT NULLIF(TRIM(holdings.name), '')
+            FROM holdings
+            WHERE holdings.symbol = watchlist_items.symbol
+              AND holdings.market = watchlist_items.market
+            LIMIT 1
+          )
+        ) AS name
       FROM watchlist_items
-      ORDER BY created_at DESC
+      ORDER BY
+        CASE list_key
+          WHEN 'main' THEN 0
+          WHEN 'sub1' THEN 1
+          WHEN 'sub2' THEN 2
+          WHEN 'sub3' THEN 3
+          WHEN 'sub4' THEN 4
+          ELSE 5
+        END,
+        sort_order ASC,
+        created_at DESC
     `)
     .all() as WatchlistItem[];
 }
@@ -357,13 +563,114 @@ export function listTickerPresets(): TickerPreset[] {
     .all() as TickerPreset[];
 }
 
-type NewHoldingInput = Omit<Holding, 'id' | 'created_at' | 'updated_at' | 'name'> & {
+export function listStockPrices(): Record<string, StockPrice> {
+  const db = getDb();
+  const rows = db
+    .prepare(`
+      SELECT *
+      FROM stock_prices
+      ORDER BY updated_at DESC
+    `)
+    .all() as StockPrice[];
+
+  return rows.reduce<Record<string, StockPrice>>((acc, price) => {
+    acc[price.symbol] = price;
+    return acc;
+  }, {});
+}
+
+export function upsertStockPrices(prices: StockPrice[]) {
+  if (prices.length === 0) return;
+
+  const db = getDb();
+  const insert = db.prepare(`
+    INSERT INTO stock_prices (symbol, market, name, price, change, change_percent, currency, updated_at)
+    VALUES (@symbol, @market, @name, @price, @change, @change_percent, @currency, @updated_at)
+    ON CONFLICT(symbol, market) DO UPDATE SET
+      name = excluded.name,
+      price = excluded.price,
+      change = excluded.change,
+      change_percent = excluded.change_percent,
+      currency = excluded.currency,
+      updated_at = excluded.updated_at
+  `);
+
+  const tx = db.transaction(() => {
+    for (const price of prices) {
+      if (!price.symbol || !isValidMarket(price.market) || !Number.isFinite(price.price)) continue;
+      insert.run({
+        symbol: price.symbol.toUpperCase().trim(),
+        market: price.market,
+        name: price.name || price.symbol,
+        price: price.price,
+        change: Number.isFinite(price.change) ? price.change : 0,
+        change_percent: Number.isFinite(price.change_percent) ? price.change_percent : 0,
+        currency: price.currency,
+        updated_at: price.updated_at,
+      });
+    }
+  });
+  tx();
+}
+
+export function listNewsItems(limit = 30): NewsItem[] {
+  const db = getDb();
+  return db
+    .prepare(`
+      SELECT *
+      FROM news_items
+      ORDER BY published_at DESC
+      LIMIT ?
+    `)
+    .all(limit) as NewsItem[];
+}
+
+export function upsertNewsItems(news: NewsItem[]) {
+  if (news.length === 0) return;
+
+  const db = getDb();
+  const insert = db.prepare(`
+    INSERT INTO news_items (id, symbol, title, summary, source, url, image_url, published_at, sentiment)
+    VALUES (@id, @symbol, @title, @summary, @source, @url, @image_url, @published_at, @sentiment)
+    ON CONFLICT(symbol, url) DO UPDATE SET
+      id = excluded.id,
+      title = excluded.title,
+      summary = excluded.summary,
+      source = excluded.source,
+      image_url = excluded.image_url,
+      published_at = excluded.published_at,
+      sentiment = excluded.sentiment
+  `);
+
+  const tx = db.transaction(() => {
+    for (const item of news) {
+      if (!item.id || !item.symbol || !item.title || !item.url) continue;
+      insert.run({
+        id: item.id,
+        symbol: item.symbol.toUpperCase().trim(),
+        title: item.title,
+        summary: item.summary ?? null,
+        source: item.source || 'Unknown',
+        url: item.url,
+        image_url: item.image_url ?? null,
+        published_at: item.published_at,
+        sentiment: item.sentiment ?? null,
+      });
+    }
+  });
+  tx();
+}
+
+type NewHoldingInput = Omit<Holding, 'id' | 'created_at' | 'updated_at' | 'name' | 'sort_order'> & {
   name?: string;
 };
 
 export function createHolding(input: NewHoldingInput): Holding {
   const db = getDb();
   const now = new Date().toISOString();
+  const maxSortOrder = db
+    .prepare('SELECT MAX(sort_order) as maxSortOrder FROM holdings')
+    .get() as { maxSortOrder: number | null };
   const holding: Holding = {
     id: crypto.randomUUID(),
     portfolio_id: input.portfolio_id,
@@ -372,6 +679,7 @@ export function createHolding(input: NewHoldingInput): Holding {
     market: input.market,
     shares: input.shares,
     avg_cost: input.avg_cost,
+    sort_order: (maxSortOrder.maxSortOrder ?? -1) + 1,
     sector: input.sector?.trim() || undefined,
     memo: input.memo?.trim() || undefined,
     created_at: now,
@@ -379,8 +687,8 @@ export function createHolding(input: NewHoldingInput): Holding {
   };
 
   db.prepare(`
-    INSERT INTO holdings (id, portfolio_id, symbol, name, market, shares, avg_cost, sector, memo, created_at, updated_at)
-    VALUES (@id, @portfolio_id, @symbol, @name, @market, @shares, @avg_cost, @sector, @memo, @created_at, @updated_at)
+    INSERT INTO holdings (id, portfolio_id, symbol, name, market, shares, avg_cost, sort_order, sector, memo, created_at, updated_at)
+    VALUES (@id, @portfolio_id, @symbol, @name, @market, @shares, @avg_cost, @sort_order, @sector, @memo, @created_at, @updated_at)
   `).run({
     ...holding,
     name: holding.name ?? null,
@@ -437,6 +745,38 @@ export function deleteHoldingById(id: string): boolean {
   const db = getDb();
   const result = db.prepare('DELETE FROM holdings WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+type HoldingOrderUpdate = {
+  id: string;
+  sort_order: number;
+};
+
+export function updateHoldingsOrder(updates: HoldingOrderUpdate[]): Holding[] {
+  const db = getDb();
+  const update = db.prepare(`
+    UPDATE holdings
+    SET sort_order = @sort_order,
+        updated_at = @updated_at
+    WHERE id = @id
+  `);
+  const now = new Date().toISOString();
+
+  const tx = db.transaction(() => {
+    for (const item of updates) {
+      if (!Number.isInteger(item.sort_order) || item.sort_order < 0) {
+        continue;
+      }
+      update.run({
+        id: item.id,
+        sort_order: item.sort_order,
+        updated_at: now,
+      });
+    }
+  });
+  tx();
+
+  return listHoldings();
 }
 
 type NewTransactionInput = {
@@ -507,9 +847,48 @@ export function createTradeIdea(input: NewTradeIdeaInput): TradeIdea {
   return idea;
 }
 
+type UpdateTradeIdeaInput = Partial<Pick<TradeIdea, 'symbol' | 'market' | 'note'>>;
+
+export function updateTradeIdeaById(id: string, updates: UpdateTradeIdeaInput): TradeIdea | null {
+  const db = getDb();
+  const current = db.prepare('SELECT * FROM trade_ideas WHERE id = ?').get(id) as TradeIdea | undefined;
+  if (!current) return null;
+
+  const now = new Date().toISOString();
+  const next: TradeIdea = {
+    ...current,
+    symbol: updates.symbol !== undefined ? updates.symbol.toUpperCase().trim() : current.symbol,
+    market: updates.market !== undefined ? updates.market : current.market,
+    note: updates.note !== undefined ? updates.note.trim() : current.note,
+    updated_at: now,
+  };
+
+  db.prepare(`
+    UPDATE trade_ideas
+    SET
+      symbol = @symbol,
+      market = @market,
+      note = @note,
+      updated_at = @updated_at
+    WHERE id = @id
+  `).run(next);
+
+  return next;
+}
+
+export function deleteTradeIdeaById(id: string): boolean {
+  const db = getDb();
+  const result = db.prepare('DELETE FROM trade_ideas WHERE id = ?').run(id);
+  return result.changes > 0;
+}
+
 type NewWatchlistItemInput = {
   symbol: string;
+  name?: string;
   market: Holding['market'];
+  list_key?: WatchlistKey;
+  sort_order?: number;
+  sector?: string;
   target_price?: number;
   memo?: string;
 };
@@ -517,10 +896,20 @@ type NewWatchlistItemInput = {
 export function createWatchlistItem(input: NewWatchlistItemInput): WatchlistItem {
   const db = getDb();
   const now = new Date().toISOString();
+  const listKey = input.list_key && isValidWatchlistKey(input.list_key) ? input.list_key : 'main';
+  const maxSortOrder = db
+    .prepare('SELECT MAX(sort_order) as maxSortOrder FROM watchlist_items WHERE list_key = ?')
+    .get(listKey) as { maxSortOrder: number | null };
   const item: WatchlistItem = {
     id: crypto.randomUUID(),
     symbol: input.symbol.toUpperCase().trim(),
+    name: input.name?.trim() || undefined,
     market: input.market,
+    list_key: listKey,
+    sort_order: input.sort_order ?? ((maxSortOrder.maxSortOrder ?? -1) + 1),
+    sector: input.sector
+      ? normalizeSectorKey(input.sector)
+      : resolveSectorForSymbol(input.symbol, input.market),
     target_price: input.target_price,
     memo: input.memo?.trim() || undefined,
     created_at: now,
@@ -528,10 +917,12 @@ export function createWatchlistItem(input: NewWatchlistItemInput): WatchlistItem
   };
 
   db.prepare(`
-    INSERT INTO watchlist_items (id, symbol, market, target_price, memo, created_at, updated_at)
-    VALUES (@id, @symbol, @market, @target_price, @memo, @created_at, @updated_at)
+    INSERT INTO watchlist_items (id, symbol, name, market, list_key, sort_order, sector, target_price, memo, created_at, updated_at)
+    VALUES (@id, @symbol, @name, @market, @list_key, @sort_order, @sector, @target_price, @memo, @created_at, @updated_at)
   `).run({
     ...item,
+    name: item.name ?? null,
+    sector: item.sector ?? null,
     target_price: item.target_price ?? null,
     memo: item.memo ?? null,
   });
@@ -575,6 +966,10 @@ export function deleteTickerPresetById(id: string): boolean {
 }
 
 type UpdateWatchlistItemInput = {
+  name?: string | null;
+  list_key?: WatchlistKey | null;
+  sort_order?: number | null;
+  sector?: string | null;
   target_price?: number | null;
   memo?: string | null;
 };
@@ -587,6 +982,19 @@ export function updateWatchlistItemById(id: string, updates: UpdateWatchlistItem
   const now = new Date().toISOString();
   const next: WatchlistItem = {
     ...current,
+    name: updates.name !== undefined ? updates.name ?? undefined : current.name,
+    list_key:
+      updates.list_key !== undefined && updates.list_key !== null
+        ? updates.list_key
+        : current.list_key,
+    sort_order:
+      updates.sort_order !== undefined && updates.sort_order !== null
+        ? updates.sort_order
+        : current.sort_order,
+    sector:
+      updates.sector !== undefined
+        ? normalizeSectorKey(updates.sector)
+        : normalizeSectorKey(current.sector),
     target_price: updates.target_price !== undefined ? updates.target_price ?? undefined : current.target_price,
     memo: updates.memo !== undefined ? updates.memo ?? undefined : current.memo,
     updated_at: now,
@@ -595,12 +1003,20 @@ export function updateWatchlistItemById(id: string, updates: UpdateWatchlistItem
   db.prepare(`
     UPDATE watchlist_items
     SET
+      name = @name,
+      list_key = @list_key,
+      sort_order = @sort_order,
+      sector = @sector,
       target_price = @target_price,
       memo = @memo,
       updated_at = @updated_at
     WHERE id = @id
   `).run({
     id: next.id,
+    name: next.name ?? null,
+    list_key: next.list_key,
+    sort_order: next.sort_order,
+    sector: next.sector ?? null,
     target_price: next.target_price ?? null,
     memo: next.memo ?? null,
     updated_at: next.updated_at,
@@ -613,6 +1029,41 @@ export function deleteWatchlistItemById(id: string): boolean {
   const db = getDb();
   const result = db.prepare('DELETE FROM watchlist_items WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+type WatchlistLayoutUpdate = {
+  id: string;
+  list_key: WatchlistKey;
+  sort_order: number;
+};
+
+export function updateWatchlistItemsLayout(updates: WatchlistLayoutUpdate[]): WatchlistItem[] {
+  const db = getDb();
+  const update = db.prepare(`
+    UPDATE watchlist_items
+    SET list_key = @list_key,
+        sort_order = @sort_order,
+        updated_at = @updated_at
+    WHERE id = @id
+  `);
+  const now = new Date().toISOString();
+
+  const tx = db.transaction(() => {
+    for (const item of updates) {
+      if (!isValidWatchlistKey(item.list_key) || !Number.isInteger(item.sort_order) || item.sort_order < 0) {
+        continue;
+      }
+      update.run({
+        id: item.id,
+        list_key: item.list_key,
+        sort_order: item.sort_order,
+        updated_at: now,
+      });
+    }
+  });
+  tx();
+
+  return listWatchlistItems();
 }
 
 export function exportBackupData(): BackupData {
@@ -645,7 +1096,7 @@ export function importBackupData(data: Partial<BackupData>) {
   const holdings = (data.holdings ?? [])
     .filter((item): item is HoldingBackup => Boolean(item?.id && item?.portfolio_id && item?.symbol && item?.market))
     .filter((item) => portfolioIds.has(item.portfolio_id))
-    .map((item) => ({
+    .map((item, index) => ({
       id: item.id,
       portfolio_id: item.portfolio_id,
       symbol: item.symbol.toUpperCase().trim(),
@@ -653,6 +1104,7 @@ export function importBackupData(data: Partial<BackupData>) {
       market: item.market,
       shares: Number(item.shares ?? 0),
       avg_cost: Number(item.avg_cost ?? 0),
+      sort_order: Number.isInteger(item.sort_order) && item.sort_order >= 0 ? item.sort_order : index,
       sector: item.sector ?? null,
       memo: item.memo ?? null,
       created_at: item.created_at ?? new Date().toISOString(),
@@ -717,7 +1169,11 @@ export function importBackupData(data: Partial<BackupData>) {
       {
         id: string;
         symbol: string;
+        name: string | null;
         market: Holding['market'];
+        list_key: WatchlistKey;
+        sort_order: number;
+        sector: string | null;
         target_price: number | null;
         memo: string | null;
         created_at: string;
@@ -725,7 +1181,7 @@ export function importBackupData(data: Partial<BackupData>) {
       }
     >();
 
-    for (const item of data.watchlistItems ?? []) {
+    for (const [index, item] of (data.watchlistItems ?? []).entries()) {
       if (!item?.id || !item.symbol || !item.market || !isValidMarket(item.market)) continue;
       const targetPrice =
         item.target_price === null || item.target_price === undefined
@@ -740,7 +1196,13 @@ export function importBackupData(data: Partial<BackupData>) {
       uniqueBySymbolAndMarket.set(key, {
         id: item.id,
         symbol: normalizedSymbol,
+        name: item.name?.trim() || null,
         market: item.market,
+        list_key: item.list_key && isValidWatchlistKey(item.list_key) ? item.list_key : 'main',
+        sort_order: Number.isInteger(item.sort_order) && item.sort_order >= 0 ? item.sort_order : index,
+        sector: item.sector
+          ? normalizeSectorKey(item.sector)
+          : resolveSectorForSymbol(normalizedSymbol, item.market),
         target_price: targetPrice,
         memo: item.memo ?? null,
         created_at: item.created_at ?? new Date().toISOString(),
@@ -788,8 +1250,8 @@ export function importBackupData(data: Partial<BackupData>) {
     VALUES (@id, @name, @broker, @description, @created_at, @updated_at)
   `);
   const insertHolding = db.prepare(`
-    INSERT INTO holdings (id, portfolio_id, symbol, name, market, shares, avg_cost, sector, memo, created_at, updated_at)
-    VALUES (@id, @portfolio_id, @symbol, @name, @market, @shares, @avg_cost, @sector, @memo, @created_at, @updated_at)
+    INSERT INTO holdings (id, portfolio_id, symbol, name, market, shares, avg_cost, sort_order, sector, memo, created_at, updated_at)
+    VALUES (@id, @portfolio_id, @symbol, @name, @market, @shares, @avg_cost, @sort_order, @sector, @memo, @created_at, @updated_at)
   `);
   const insertTransaction = db.prepare(`
     INSERT INTO transactions (id, portfolio_id, symbol, market, type, shares, price, total_amount, fees, transaction_date, memo, created_at)
@@ -800,8 +1262,8 @@ export function importBackupData(data: Partial<BackupData>) {
     VALUES (@id, @symbol, @market, @note, @created_at, @updated_at)
   `);
   const insertWatchlistItem = db.prepare(`
-    INSERT INTO watchlist_items (id, symbol, market, target_price, memo, created_at, updated_at)
-    VALUES (@id, @symbol, @market, @target_price, @memo, @created_at, @updated_at)
+    INSERT INTO watchlist_items (id, symbol, name, market, list_key, sort_order, sector, target_price, memo, created_at, updated_at)
+    VALUES (@id, @symbol, @name, @market, @list_key, @sort_order, @sector, @target_price, @memo, @created_at, @updated_at)
   `);
   const insertTickerPreset = db.prepare(`
     INSERT INTO ticker_presets (id, symbol, market, name, created_at, updated_at)
@@ -809,6 +1271,8 @@ export function importBackupData(data: Partial<BackupData>) {
   `);
 
   const tx = db.transaction(() => {
+    db.prepare('DELETE FROM news_items').run();
+    db.prepare('DELETE FROM stock_prices').run();
     db.prepare('DELETE FROM watchlist_items').run();
     db.prepare('DELETE FROM ticker_presets').run();
     db.prepare('DELETE FROM trade_ideas').run();
@@ -853,6 +1317,8 @@ export function importBackupData(data: Partial<BackupData>) {
 export function clearAllData() {
   const db = getDb();
   const tx = db.transaction(() => {
+    db.prepare('DELETE FROM news_items').run();
+    db.prepare('DELETE FROM stock_prices').run();
     db.prepare('DELETE FROM watchlist_items').run();
     db.prepare('DELETE FROM ticker_presets').run();
     db.prepare('DELETE FROM trade_ideas').run();

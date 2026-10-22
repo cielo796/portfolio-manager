@@ -10,6 +10,7 @@ import { PortfolioSummaryCard } from '@/components/portfolio-summary';
 import { HoldingsTable } from '@/components/holdings-table';
 import { NewsList } from '@/components/news-list';
 import { SectorChart } from '@/components/sector-chart';
+import { HoldingChart } from '@/components/holding-chart';
 import { AddHoldingModal, HoldingFormData } from '@/components/add-holding-modal';
 import { AddTransactionModal, TransactionFormData } from '@/components/add-transaction-modal';
 import { EditHoldingModal, EditHoldingData } from '@/components/edit-holding-modal';
@@ -26,18 +27,23 @@ export default function Dashboard() {
     exchangeRate,
     summary,
     sectorAllocation,
+    holdingAllocation,
     isLoading,
     isRefreshing,
+    isRefreshingNews,
     refreshPrices,
+    refreshNews,
     addHolding,
     addTransaction,
     updateHolding,
     removeHolding,
+    reorderHoldings,
   } = usePortfolio();
   const { tickerPresets } = useTickerPresets();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddTransactionModalOpen, setIsAddTransactionModalOpen] = useState(false);
+  const [isReorderingHoldings, setIsReorderingHoldings] = useState(false);
   const [selectedHolding, setSelectedHolding] = useState<HoldingWithPrice | null>(null);
 
   const handleAddHolding = async (data: HoldingFormData) => {
@@ -72,6 +78,17 @@ export default function Dashboard() {
     } catch {
       alert('ポジションの決済に失敗しました。');
       throw new Error('failed_to_close_holding');
+    }
+  };
+
+  const handleReorderHoldings = async (orderedHoldings: HoldingWithPrice[]) => {
+    setIsReorderingHoldings(true);
+    try {
+      await reorderHoldings(orderedHoldings.map((holding) => holding.id));
+    } catch {
+      alert('銘柄の並び順の保存に失敗しました。');
+    } finally {
+      setIsReorderingHoldings(false);
     }
   };
 
@@ -131,12 +148,17 @@ export default function Dashboard() {
               <span className="text-sm text-slate-500">{holdings.length}銘柄（クリックで編集/決済）</span>
             </CardHeader>
             <CardContent className="p-0">
-              <HoldingsTable holdings={holdings} onHoldingClick={setSelectedHolding} />
+              <HoldingsTable
+                holdings={holdings}
+                onHoldingClick={setSelectedHolding}
+                onReorder={handleReorderHoldings}
+                isReordering={isReorderingHoldings}
+              />
             </CardContent>
           </Card>
         </div>
 
-        {/* サイドバー：セクター配分 */}
+        {/* サイドバー：配分チャート */}
         <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
           <Card className="mb-6">
             <CardHeader>
@@ -144,6 +166,14 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <SectorChart data={sectorAllocation} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>銘柄別配分</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HoldingChart data={holdingAllocation} />
             </CardContent>
           </Card>
         </div>
@@ -170,9 +200,20 @@ export default function Dashboard() {
               <Newspaper className="w-5 h-5 text-blue-400" />
               <CardTitle>最新ニュース</CardTitle>
             </div>
-            <a href="/news" className="text-sm text-blue-400 hover:text-blue-300 transition-colors">
-              すべて見る →
-            </a>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={refreshNews}
+                disabled={isRefreshingNews}
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshingNews ? 'animate-spin' : ''}`} />
+                ニュース更新
+              </Button>
+              <a href="/news" className="text-sm text-blue-400 hover:text-blue-300 transition-colors">
+                すべて見る →
+              </a>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <NewsList news={news} maxItems={5} />

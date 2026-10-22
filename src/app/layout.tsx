@@ -5,6 +5,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Portfolio Manager - 投資ポートフォリオ管理",
   description: "米国株・日本株・FXを一元管理する投資ポートフォリオ管理アプリ",
+  icons: {
+    icon: [{ url: "/brand-mark.svg", type: "image/svg+xml" }, { url: "/favicon.ico" }],
+    apple: "/app-icon.png",
+  },
 };
 
 export default function RootLayout({

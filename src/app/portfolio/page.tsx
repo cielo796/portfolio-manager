@@ -18,7 +18,9 @@ export default function PortfolioPage() {
     isLoading,
     updateHolding,
     removeHolding,
+    reorderHoldings,
   } = usePortfolio();
+  const [isReorderingHoldings, setIsReorderingHoldings] = useState(false);
   const [selectedHolding, setSelectedHolding] = useState<HoldingWithPrice | null>(null);
 
   const handleUpdateHolding = async (id: string, data: EditHoldingData) => {
@@ -37,6 +39,17 @@ export default function PortfolioPage() {
     } catch {
       alert('ポジションの決済に失敗しました。');
       throw new Error('failed_to_close_holding');
+    }
+  };
+
+  const handleReorderHoldings = async (orderedHoldings: HoldingWithPrice[]) => {
+    setIsReorderingHoldings(true);
+    try {
+      await reorderHoldings(orderedHoldings.map((holding) => holding.id));
+    } catch {
+      alert('銘柄の並び順の保存に失敗しました。');
+    } finally {
+      setIsReorderingHoldings(false);
     }
   };
 
@@ -66,7 +79,12 @@ export default function PortfolioPage() {
               <span className="text-sm text-slate-500">{holdings.length}銘柄（クリックで編集/決済）</span>
             </CardHeader>
             <CardContent className="p-0">
-              <HoldingsTable holdings={holdings} onHoldingClick={setSelectedHolding} />
+              <HoldingsTable
+                holdings={holdings}
+                onHoldingClick={setSelectedHolding}
+                onReorder={handleReorderHoldings}
+                isReordering={isReorderingHoldings}
+              />
             </CardContent>
           </Card>
         </div>

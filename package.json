@@ -2,9 +2,11 @@
   "name": "portfolio-manager",
   "version": "0.1.0",
   "private": true,
+  "productName": "Portfolio Manager",
+  "main": "electron/main.mjs",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "cross-env NODE_OPTIONS=--require=./scripts/node-readlink-eisdir-fix.cjs next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "desktop": "npm run desktop:start",
