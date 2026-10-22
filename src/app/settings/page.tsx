@@ -7,6 +7,7 @@ import { Input, Select } from '@/components/ui/input';
 import { Database, Download, Plus, Trash2, Upload } from 'lucide-react';
 import { Market, TickerPreset } from '@/types';
 import { normalizeFxSymbol } from '@/lib/utils';
+import { SyncSettings } from '@/components/settings/sync-settings';
 
 type TickerPresetsResponse = {
   tickerPresets?: TickerPreset[];
@@ -187,6 +188,8 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold text-slate-100">Settings</h1>
         <p className="text-sm text-slate-500 mt-1">Manage ticker presets, backup, and storage.</p>
       </div>
+
+      <SyncSettings />
 
       <Card className="mb-6">
         <CardHeader>
