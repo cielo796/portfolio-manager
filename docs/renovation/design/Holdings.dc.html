@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>保有銘柄 — Portfolio Manager</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0f14}
+a{color:#7fb3ff;text-decoration:none}a:hover{color:#b3d1ff}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.tbl{min-width:1180px;font-size:12px}
+.tr{display:grid;grid-template-columns:64px minmax(120px,1.6fr) 44px 80px 72px 84px 88px 72px 68px 104px 104px 96px 68px 84px 60px;align-items:center;border-bottom:1px solid #1b222c}
+.tr>div{padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th{position:sticky;top:0;z-index:1;height:26px;background:#161c25;color:#9aa6b6;font-weight:500;border-bottom:1px solid #232b36}
+.compact .tr:not(.th){height:24px}.standard .tr:not(.th){height:32px}
+.grp{background:#141a22;font-weight:600}
+.total{background:#161c25;font-weight:600;border-top:1px solid #2c3644}
+.span10{grid-column:span 10}
+.r{text-align:right}
+.rowbtn{all:unset;cursor:pointer;color:#d8dee7}.rowbtn:hover{color:#b3d1ff;text-decoration:underline}
+.seg{height:26px;padding:0 10px;background:#1d2530;color:#c3ccd8;border:1px solid #2c3644;font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column; background: #0b0f14; color: #d8dee7; font-family: Inter, 'Noto Sans JP', sans-serif; font-size: 12px; line-height: 1.4">
+<dc-import name="TopBar" hint-size="100%,40px"></dc-import>
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; min-height: 0">
+<div style="flex: 1 1 160px; max-width: 100%; display: flex">
+<dc-import name="SideNav" current="holdings" hint-size="168px,100%"></dc-import>
+</div>
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px">
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 6px">
+<h1 style="margin: 0 8px 0 0; font-size: 14px; font-weight: 600">保有銘柄</h1>
+<div role="group" aria-label="グループ化" style="display: flex">
+<button type="button" class="seg" aria-pressed="true" style="border-radius: 4px 0 0 4px; background: #2a2214; color: #f5b955; border-color: #6b5226">市場</button>
+<button type="button" class="seg" aria-pressed="false" style="margin-left: -1px">セクター</button>
+<button type="button" class="seg" aria-pressed="false" style="margin-left: -1px">口座</button>
+<button type="button" class="seg" aria-pressed="false" style="margin-left: -1px; border-radius: 0 4px 4px 0">なし</button>
+</div>
+<label for="h-filter" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">絞り込み</label>
+<input id="h-filter" type="search" placeholder="コード・銘柄名・メモで絞り込み" style="height: 26px; width: 220px; box-sizing: border-box; padding: 0 8px; background: #0b0f14; color: #d8dee7; border: 1px solid #2c3644; border-radius: 4px; font: inherit">
+<span style="flex: 1 1 0"></span>
+<button type="button" class="seg" style="border-radius: 4px">列 15/18</button>
+<button type="button" class="seg" style="border-radius: 4px">CSV出力</button>
+<button type="button" class="seg" style="border-radius: 4px; background: #f0a33a; color: #1a1205; border-color: #f0a33a; font-weight: 600">＋ 保有を追加</button>
+</div>
+
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 4px; min-height: 0">
+<section aria-label="保有銘柄一覧" style="flex: 999 1 640px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px; overflow: auto">
+<div role="table" aria-label="保有銘柄" class="tbl {{density}}">
+<div role="row" class="tr th">
+<div role="columnheader">コード</div><div role="columnheader">銘柄名</div><div role="columnheader">市場</div><div role="columnheader">セクター</div>
+<div role="columnheader" class="r">数量</div><div role="columnheader" class="r">取得単価</div><div role="columnheader" class="r">現在値</div><div role="columnheader" class="r">前日比</div><div role="columnheader" class="r">前日比%</div>
+<div role="columnheader" class="r">評価額（現地）</div><div role="columnheader" class="r">評価額（円）</div><div role="columnheader" class="r">評価損益</div><div role="columnheader" class="r">損益%</div><div role="columnheader" class="r">当日損益</div><div role="columnheader" class="r">構成比</div>
+</div>
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+<div role="row" class="tr grp"><div role="cell" class="span10">{{g.label}}　<span style="color: #9aa6b6; font-weight: 400">{{g.count}}</span></div><div role="cell" class="r num">{{g.val}}</div><div role="cell" class="r num" style="color: {{g.plColor}}">{{g.pl}}</div><div role="cell" class="r num" style="color: {{g.plColor}}">{{g.plPct}}</div><div role="cell" class="r num" style="color: {{g.dayColor}}">{{g.day}}</div><div role="cell" class="r num">{{g.weight}}</div></div>
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="3">
+<div role="row" class="tr" style="{{r.rowStyle}}" aria-selected="{{r.selected}}">
+<div role="cell" style="color: #9aa6b6">{{r.code}}</div>
+<div role="cell"><button type="button" class="rowbtn" onClick="{{r.pick}}">{{r.name}}</button></div>
+<div role="cell" style="color: #9aa6b6">{{r.mkt}}</div><div role="cell" style="color: #9aa6b6">{{r.sector}}</div>
+<div role="cell" class="r num">{{r.qty}}</div><div role="cell" class="r num">{{r.cost}}</div><div role="cell" class="r num" style="font-weight: 600">{{r.px}}</div>
+<div role="cell" class="r num" style="color: {{r.chgColor}}">{{r.chg}}</div><div role="cell" class="r num" style="color: {{r.chgColor}}">{{r.chgPct}}</div>
+<div role="cell" class="r num">{{r.valLocal}}</div><div role="cell" class="r num">{{r.valJpy}}</div>
+<div role="cell" class="r num" style="color: {{r.plColor}}">{{r.pl}}</div><div role="cell" class="r num" style="color: {{r.plColor}}">{{r.plPct}}</div>
+<div role="cell" class="r num" style="color: {{r.dayColor}}">{{r.day}}</div><div role="cell" class="r num">{{r.weight}}</div>
+</div>
+</sc-for>
+</sc-for>
+<div role="row" class="tr total"><div role="cell" class="span10">合計　<span style="color: #9aa6b6; font-weight: 400">7銘柄</span></div><div role="cell" class="r num">{{sum.val}}</div><div role="cell" class="r num" style="color: {{sum.plColor}}">{{sum.pl}}</div><div role="cell" class="r num" style="color: {{sum.plColor}}">{{sum.plPct}}</div><div role="cell" class="r num" style="color: {{sum.dayColor}}">{{sum.day}}</div><div role="cell" class="r num">100.0%</div></div>
+</div>
+</section>
+
+<aside aria-label="選択中の銘柄" style="flex: 1 1 320px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px; display: flex; flex-direction: column">
+<div style="padding: 10px 12px; border-bottom: 1px solid #232b36">
+<div style="display: flex; align-items: baseline; gap: 8px"><span style="color: #9aa6b6">{{sel.code}}</span><span style="font-size: 14px; font-weight: 600">{{sel.name}}</span><span style="color: #9aa6b6">{{sel.mkt}}</span></div>
+<div style="display: flex; align-items: baseline; gap: 10px; margin-top: 4px"><span class="num" style="font-size: 22px; font-weight: 600">{{sel.px}}</span><span class="num" style="color: {{sel.chgColor}}">{{sel.chg}}（{{sel.chgPct}}）</span></div>
+</div>
+<div style="padding: 8px 12px; border-bottom: 1px solid #232b36">
+<div style="display: flex; gap: 4px; margin-bottom: 6px">
+<button type="button" class="seg" style="height: 22px; border-radius: 3px">1M</button>
+<button type="button" class="seg" style="height: 22px; border-radius: 3px">3M</button>
+<button type="button" class="seg" style="height: 22px; border-radius: 3px; background: #2a2214; color: #f5b955; border-color: #6b5226">1Y</button>
+<button type="button" class="seg" style="height: 22px; border-radius: 3px">5Y</button>
+</div>
+<svg viewBox="0 0 300 120" width="100%" height="120" role="img" aria-label="1年の価格推移と取得単価" preserveAspectRatio="none">
+<line x1="0" x2="300" y1="30" y2="30" stroke="#1b222c"></line><line x1="0" x2="300" y1="60" y2="60" stroke="#1b222c"></line><line x1="0" x2="300" y1="90" y2="90" stroke="#1b222c"></line>
+<line x1="0" x2="300" y1="{{sel.costY}}" y2="{{sel.costY}}" stroke="#f0a33a" stroke-dasharray="4 3"></line>
+<path d="{{sel.path}}" fill="none" stroke="#7fb3ff" stroke-width="1.5"></path>
+</svg>
+<div style="display: flex; justify-content: space-between; color: #9aa6b6; font-size: 11px"><span><span style="color: #f0a33a">― </span>取得単価 {{sel.cost}}</span><span>1年</span></div>
+</div>
+<dl style="margin: 0; padding: 8px 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; border-bottom: 1px solid #232b36">
+<div><dt style="color: #9aa6b6; font-size: 11px">保有数量</dt><dd class="num" style="margin: 0; text-align: left">{{sel.qty}}</dd></div>
+<div><dt style="color: #9aa6b6; font-size: 11px">取得単価</dt><dd class="num" style="margin: 0; text-align: left">{{sel.cost}}</dd></div>
+<div><dt style="color: #9aa6b6; font-size: 11px">評価額（現地）</dt><dd class="num" style="margin: 0; text-align: left">{{sel.valLocal}}</dd></div>
+<div><dt style="color: #9aa6b6; font-size: 11px">評価額（円）</dt><dd class="num" style="margin: 0; text-align: left">{{sel.valJpy}}</dd></div>
+<div><dt style="color: #9aa6b6; font-size: 11px">評価損益</dt><dd class="num" style="margin: 0; text-align: left; color: {{sel.plColor}}">{{sel.pl}}（{{sel.plPct}}）</dd></div>
+<div><dt style="color: #9aa6b6; font-size: 11px">当日損益</dt><dd class="num" style="margin: 0; text-align: left; color: {{sel.dayColor}}">{{sel.day}}</dd></div>
+<div><dt style="color: #9aa6b6; font-size: 11px">構成比</dt><dd class="num" style="margin: 0; text-align: left">{{sel.weight}}</dd></div>
+<div><dt style="color: #9aa6b6; font-size: 11px">セクター</dt><dd style="margin: 0">{{sel.sector}}</dd></div>
+</dl>
+<div style="padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto">
+<div style="display: flex; align-items: center; gap: 6px"><span style="color: #9aa6b6; font-size: 11px">銘柄メモ 5件</span><span style="padding: 0 6px; border: 1px solid #6b5226; border-radius: 3px; color: #f5b955; font-size: 11px">トップピック #1</span><span style="flex: 1"></span><a href="Memos.dc.html" style="font-size: 11px">＋ メモを書く</a></div>
+<ul style="list-style: none; margin: 0; padding: 0">
+<li style="display: flex; gap: 8px; height: 24px; align-items: center; border-bottom: 1px solid #1b222c"><span style="color: #9aa6b6; font-variant-numeric: tabular-nums">10/22</span><a href="Memos.dc.html" style="flex: 1; color: #d8dee7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Q3決算前の確認ポイント</a><span style="color: #9aa6b6">決算</span></li>
+<li style="display: flex; gap: 8px; height: 24px; align-items: center; border-bottom: 1px solid #1b222c"><span style="color: #9aa6b6; font-variant-numeric: tabular-nums">10/20</span><a href="Memos.dc.html" style="flex: 1; color: #d8dee7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">データセンター向けGPUの比較</a><span style="color: #9aa6b6">アイデア</span></li>
+<li style="display: flex; gap: 8px; height: 24px; align-items: center"><span style="color: #9aa6b6; font-variant-numeric: tabular-nums">10/08</span><a href="Memos.dc.html" style="flex: 1; color: #d8dee7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">買い増しの目安</a><span style="color: #9aa6b6">売買理由</span></li>
+</ul>
+<div style="display: flex; gap: 6px; margin-top: auto">
+<a href="Detail.dc.html" style="flex: 1; display: flex; align-items: center; justify-content: center; height: 28px; border: 1px solid #2c3644; border-radius: 4px; background: #1d2530; color: #d8dee7">銘柄詳細を開く</a>
+<a href="Records.dc.html" style="flex: 1; display: flex; align-items: center; justify-content: center; height: 28px; border: 1px solid #2c3644; border-radius: 4px; background: #1d2530; color: #d8dee7">売買を記録</a>
+</div>
+</div>
+</aside>
+</div>
+
+</main>
+</div>
+<dc-import name="Ticker" updown="{{updown}}" hint-size="100%,48px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"updown":{"editor":"enum","options":["日本式","米国式"],"default":"日本式","section":"表示"},"density":{"editor":"enum","options":["compact","standard"],"default":"compact","section":"表示"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { selected: 'NVDA' };
+  }
+  renderVals() {
+    const updown = this.props.updown ?? '日本式';
+    const c = updown === '米国式' ? { up: '#2fc677', down: '#ff5c5c' } : { up: '#ff5c5c', down: '#4ea2ff' };
+    const col = (n) => (n > 0 ? c.up : n < 0 ? c.down : '#9aa6b6');
+    const f = (n, d) => n.toLocaleString('ja-JP', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const s = (n, d) => (n > 0 ? '+' : '') + f(n, d);
+    const RATE = 154.82;
+    const RAW = [
+      { code: 'NVDA', name: 'NVIDIA', mkt: 'US', sector: '情報技術', qty: 50, cost: 98.5, px: 142.5, chg: 3.25 },
+      { code: 'AAPL', name: 'Apple', mkt: 'US', sector: '情報技術', qty: 100, cost: 175, px: 185.2, chg: -1.8 },
+      { code: 'MSFT', name: 'Microsoft', mkt: 'US', sector: '情報技術', qty: 30, cost: 380, px: 415.8, chg: 5.2 },
+      { code: '7203', name: 'トヨタ自動車', mkt: 'JP', sector: '一般消費財', qty: 300, cost: 3000, px: 2850, chg: -50 },
+      { code: '6758', name: 'ソニーグループ', mkt: 'JP', sector: '一般消費財', qty: 100, cost: 12500, px: 13200, chg: 280 },
+      { code: '8306', name: '三菱UFJ FG', mkt: 'JP', sector: '金融', qty: 500, cost: 1200, px: 1850, chg: 45 },
+      { code: 'USDJPY', name: '米ドル/円', mkt: 'FX', sector: 'FX', qty: 10000, cost: 152.35, px: 154.82, chg: 0.63 }
+    ];
+    const mktLabel = { US: '米国', JP: '日本', FX: 'FX' };
+    const cur = { US: '$', JP: '¥', FX: '¥' };
+    const calc = RAW.map((h) => {
+      const fx = h.mkt === 'US' ? RATE : 1;
+      const dec = h.mkt === 'JP' ? 0 : h.mkt === 'FX' ? 3 : 2;
+      const valLocal = h.qty * h.px;
+      const valJpy = valLocal * fx;
+      const costJpy = h.qty * h.cost * fx;
+      return { ...h, dec, valLocal, valJpy, costJpy, pl: valJpy - costJpy, day: h.qty * h.chg * fx, chgPct: (h.chg / (h.px - h.chg)) * 100 };
+    });
+    const total = calc.reduce((a, h) => a + h.valJpy, 0);
+    const pct = (v) => f((v / total) * 100, 1) + '%';
+    const fmt = (h) => ({
+      code: h.code, name: h.name, mkt: mktLabel[h.mkt], sector: h.sector,
+      qty: f(h.qty, 0), cost: cur[h.mkt] + f(h.cost, h.dec), px: cur[h.mkt] + f(h.px, h.dec),
+      chg: s(h.chg, h.dec), chgPct: s(h.chgPct, 2) + '%', chgColor: col(h.chg),
+      valLocal: cur[h.mkt] + f(h.valLocal, h.mkt === 'US' ? 2 : 0), valJpy: f(h.valJpy, 0),
+      pl: s(h.pl, 0), plPct: s((h.pl / h.costJpy) * 100, 2) + '%', plColor: col(h.pl),
+      day: s(h.day, 0), dayColor: col(h.day), weight: pct(h.valJpy)
+    });
+    const sel0 = calc.find((h) => h.code === this.state.selected) || calc[0];
+    const groups = ['US', 'JP', 'FX'].map((m) => {
+      const hs = calc.filter((h) => h.mkt === m);
+      const v = hs.reduce((a, h) => a + h.valJpy, 0);
+      const cst = hs.reduce((a, h) => a + h.costJpy, 0);
+      const d = hs.reduce((a, h) => a + h.day, 0);
+      return {
+        label: { US: '米国株', JP: '日本株', FX: 'FX' }[m], count: hs.length + '銘柄',
+        val: f(v, 0), pl: s(v - cst, 0), plPct: s(((v - cst) / cst) * 100, 2) + '%', plColor: col(v - cst),
+        day: s(d, 0), dayColor: col(d), weight: pct(v),
+        rows: hs.map((h) => ({
+          ...fmt(h),
+          selected: h.code === sel0.code ? 'true' : 'false',
+          rowStyle: h.code === sel0.code ? 'background: #1a2638' : '',
+          pick: () => this.setState({ selected: h.code })
+        }))
+      };
+    });
+    const cost = calc.reduce((a, h) => a + h.costJpy, 0);
+    const day = calc.reduce((a, h) => a + h.day, 0);
+    const sum = { val: f(total, 0), pl: s(total - cost, 0), plPct: s(((total - cost) / cost) * 100, 2) + '%', plColor: col(total - cost), day: s(day, 0), dayColor: col(day) };
+    const seed = sel0.code.charCodeAt(0) + sel0.code.length;
+    const pts = [];
+    const lo = Math.min(sel0.cost, sel0.px) * 0.85;
+    const hi = Math.max(sel0.cost, sel0.px) * 1.08;
+    const yOf = (v) => 115 - ((v - lo) / (hi - lo)) * 110;
+    for (let i = 0; i <= 60; i++) {
+      const t = i / 60;
+      const base = sel0.cost * 0.95 + (sel0.px - sel0.cost * 0.95) * t;
+      const v = base * (1 + Math.sin(i * 0.5 + seed) * 0.03 + Math.sin(i * 0.17 + seed) * 0.04 * (1 - t));
+      pts.push((i === 0 ? 'M' : 'L') + (t * 300).toFixed(1) + ' ' + yOf(i === 60 ? sel0.px : v).toFixed(1));
+    }
+    const sel = { ...fmt(sel0), path: pts.join(' '), costY: yOf(sel0.cost).toFixed(1) };
+    return { updown, density: this.props.density ?? 'compact', groups, sum, sel };
+  }
+}
+</script>
+</body>
+</html>

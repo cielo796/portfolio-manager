@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>登録銘柄 — Portfolio Manager</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0f14}
+a{color:#7fb3ff;text-decoration:none}a:hover{color:#b3d1ff}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.tbl{min-width:1560px;font-size:12px}
+.tr{display:grid;grid-template-columns:18px 56px minmax(120px,1.4fr) 76px 64px 64px 72px 90px 76px 76px 64px 76px 68px 56px 52px 60px 72px 64px minmax(120px,1fr);align-items:center;border-bottom:1px solid #1b222c}
+.tr>div{padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th{position:sticky;top:0;z-index:1;height:26px;background:#161c25;color:#9aa6b6;font-weight:500;border-bottom:1px solid #232b36}
+.compact .tr:not(.th){height:24px}.standard .tr:not(.th){height:32px}
+.grp{background:#141a22;font-weight:600}
+.span19{grid-column:1 / -1}
+.tab{height:28px;padding:0 14px;background:transparent;color:#9aa6b6;border:0;border-bottom:2px solid transparent;font:inherit;cursor:pointer}
+.tab.on{color:#f5b955;border-bottom-color:#f0a33a;font-weight:600}
+.chip{height:22px;padding:0 8px;border-radius:11px;background:#1d2530;color:#c3ccd8;border:1px solid #2c3644;font:inherit;font-size:11px;cursor:pointer}
+.chip.on{background:#2a2214;color:#f5b955;border-color:#6b5226}
+.btn{height:26px;padding:0 10px;background:#1d2530;color:#c3ccd8;border:1px solid #2c3644;border-radius:4px;font:inherit;cursor:pointer}
+.grip{color:#5d6876;cursor:grab}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column; background: #0b0f14; color: #d8dee7; font-family: Inter, 'Noto Sans JP', sans-serif; font-size: 12px; line-height: 1.4">
+<dc-import name="TopBar" hint-size="100%,40px"></dc-import>
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; min-height: 0">
+<div style="flex: 1 1 160px; max-width: 100%; display: flex">
+<dc-import name="SideNav" current="watchlist" hint-size="168px,100%"></dc-import>
+</div>
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px">
+
+<div style="background: #11161d; border: 1px solid #232b36; border-radius: 4px">
+<div role="tablist" aria-label="登録リスト" style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 2px; padding: 0 8px; border-bottom: 1px solid #232b36">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+<button type="button" role="tab" aria-selected="{{t.sel}}" class="{{t.cls}}" onClick="{{t.pick}}">{{t.label}}</button>
+</sc-for>
+<span style="flex: 1 1 0"></span>
+<span style="color: #9aa6b6; padding: 0 0 6px">ドラッグで並べ替え・別のリストへ移動</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px">
+<button type="button" class="chip on">すべて 13</button>
+<button type="button" class="chip">情報技術 6</button>
+<button type="button" class="chip">通信サービス 2</button>
+<button type="button" class="chip">一般消費財 2</button>
+<button type="button" class="chip">ヘルスケア 1</button>
+<button type="button" class="chip">金融 2</button>
+<span style="flex: 1 1 0"></span>
+<label for="w-q" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">検索</label>
+<input id="w-q" type="search" placeholder="コード・銘柄名・メモで検索" style="height: 26px; width: 200px; box-sizing: border-box; padding: 0 8px; background: #0b0f14; color: #d8dee7; border: 1px solid #2c3644; border-radius: 4px; font: inherit">
+<button type="button" class="btn">セクター順に整列</button>
+<button type="button" class="btn">列 19/19</button>
+<button type="button" class="btn">価格・指標を更新</button>
+<button type="button" class="btn" style="background: #f0a33a; color: #1a1205; border-color: #f0a33a; font-weight: 600">＋ 銘柄を追加</button>
+</div>
+</div>
+
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 4px; min-height: 0">
+<section aria-label="登録銘柄一覧" style="flex: 999 1 640px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px; overflow: auto">
+<div role="table" aria-label="登録銘柄" class="tbl {{density}}">
+<div role="row" class="tr th">
+<div role="columnheader"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">並べ替え</span></div>
+<div role="columnheader">コード</div><div role="columnheader">銘柄名</div>
+<div role="columnheader" class="num">現在値</div><div role="columnheader" class="num">前日比</div><div role="columnheader" class="num">前日比%</div><div role="columnheader" class="num">出来高</div><div role="columnheader">5日</div>
+<div role="columnheader" class="num">52週高値</div><div role="columnheader" class="num">52週安値</div><div role="columnheader" class="num">高値から</div>
+<div role="columnheader" class="num">目標価格</div><div role="columnheader" class="num">目標まで</div>
+<div role="columnheader" class="num">PER</div><div role="columnheader" class="num">PBR</div><div role="columnheader" class="num">利回り</div><div role="columnheader" class="num">時価総額</div><div role="columnheader" class="num">次回決算</div>
+<div role="columnheader">メモ</div>
+</div>
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+<div role="row" class="tr grp"><div role="cell" class="span19"><span style="display: inline-block; padding: 0 6px; margin-right: 6px; border-radius: 3px; border: 1px solid {{g.color}}; color: {{g.color}}; font-size: 11px; font-weight: 500">{{g.label}}</span><span style="color: #9aa6b6; font-weight: 400">{{g.count}}</span></div></div>
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="3">
+<div role="row" class="tr">
+<div role="cell" class="grip" aria-hidden="true">⋮⋮</div>
+<div role="cell" style="color: #9aa6b6">{{r.code}}</div>
+<div role="cell"><a href="Detail.dc.html" style="color: #d8dee7">{{r.name}}</a></div>
+<div role="cell" class="num" style="font-weight: 600">{{r.px}}</div>
+<div role="cell" class="num" style="color: {{r.color}}">{{r.chg}}</div>
+<div role="cell" class="num" style="color: {{r.color}}">{{r.pct}}</div>
+<div role="cell" class="num" style="color: #c3ccd8">{{r.vol}}</div>
+<div role="cell"><svg viewBox="0 0 80 18" width="78" height="18" aria-hidden="true"><path d="{{r.spark}}" fill="none" stroke="{{r.color}}" stroke-width="1.2"></path></svg></div>
+<div role="cell" class="num">{{r.hi}}</div>
+<div role="cell" class="num">{{r.lo}}</div>
+<div role="cell" class="num" style="color: #c3ccd8">{{r.fromHi}}</div>
+<div role="cell" class="num" style="{{r.tgtStyle}}">{{r.tgt}}</div>
+<div role="cell" class="num" style="{{r.toTgtStyle}}">{{r.toTgt}}</div>
+<div role="cell" class="num">{{r.per}}</div>
+<div role="cell" class="num">{{r.pbr}}</div>
+<div role="cell" class="num">{{r.yld}}</div>
+<div role="cell" class="num">{{r.cap}}</div>
+<div role="cell" class="num">{{r.earn}}</div>
+<div role="cell" style="color: #9aa6b6">{{r.memo}}</div>
+</div>
+</sc-for>
+</sc-for>
+</div>
+</section>
+
+<aside aria-labelledby="w-ideas" style="flex: 1 1 280px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px; display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; height: 30px; padding: 0 10px; border-bottom: 1px solid #232b36">
+<h2 id="w-ideas" style="margin: 0; font-size: 12px; font-weight: 600">トレードアイデア</h2>
+<span style="flex: 1"></span>
+<button type="button" class="btn" style="height: 22px">＋ 追加</button>
+</div>
+<div style="padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #232b36">
+<label for="w-idea-sym" style="color: #9aa6b6; font-size: 11px">銘柄</label>
+<select id="w-idea-sym" style="height: 26px; background: #0b0f14; color: #d8dee7; border: 1px solid #2c3644; border-radius: 4px; font: inherit"><option>AVGO　Broadcom</option></select>
+<label for="w-idea-note" style="color: #9aa6b6; font-size: 11px">メモ</label>
+<textarea id="w-idea-note" rows="3" placeholder="エントリー条件・根拠など" style="resize: vertical; background: #0b0f14; color: #d8dee7; border: 1px solid #2c3644; border-radius: 4px; padding: 6px 8px; font: inherit"></textarea>
+</div>
+<ul style="list-style: none; margin: 0; padding: 0; overflow: auto">
+<li style="padding: 8px 10px; border-bottom: 1px solid #1b222c"><div style="display: flex; gap: 8px"><span style="color: #7fb3ff">AMD</span><span style="flex: 1"></span><span class="num" style="color: #9aa6b6">10/20</span></div><div style="color: #c3ccd8; margin-top: 2px">[アイデアのメモ本文。2行まで表示して、続きは展開]</div></li>
+<li style="padding: 8px 10px; border-bottom: 1px solid #1b222c"><div style="display: flex; gap: 8px"><span style="color: #7fb3ff">8035</span><span style="flex: 1"></span><span class="num" style="color: #9aa6b6">10/18</span></div><div style="color: #c3ccd8; margin-top: 2px">[アイデアのメモ本文。2行まで表示して、続きは展開]</div></li>
+<li style="padding: 8px 10px; border-bottom: 1px solid #1b222c"><div style="display: flex; gap: 8px"><span style="color: #7fb3ff">LLY</span><span style="flex: 1"></span><span class="num" style="color: #9aa6b6">10/11</span></div><div style="color: #c3ccd8; margin-top: 2px">[アイデアのメモ本文。2行まで表示して、続きは展開]</div></li>
+</ul>
+</aside>
+</div>
+
+</main>
+</div>
+<dc-import name="Ticker" updown="{{updown}}" hint-size="100%,48px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"updown":{"editor":"enum","options":["日本式","米国式"],"default":"日本式","section":"表示"},"density":{"editor":"enum","options":["compact","standard"],"default":"compact","section":"表示"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'main' };
+  }
+  renderVals() {
+    const updown = this.props.updown ?? '日本式';
+    const c = updown === '米国式' ? { up: '#2fc677', down: '#ff5c5c' } : { up: '#ff5c5c', down: '#4ea2ff' };
+    const col = (n) => (n > 0 ? c.up : n < 0 ? c.down : '#9aa6b6');
+    const f = (n, d) => n.toLocaleString('ja-JP', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const s = (n, d) => (n > 0 ? '+' : '') + f(n, d);
+    const TABS = [['main', 'メイン'], ['sub1', 'サブ1'], ['sub2', 'サブ2　テック・通信・消費'], ['sub3', 'サブ3　ヘルスケア・金融・資本財'], ['sub4', 'サブ4　その他']];
+    const tabs = TABS.map((t) => ({ label: t[1], sel: t[0] === this.state.tab ? 'true' : 'false', cls: t[0] === this.state.tab ? 'tab on' : 'tab', pick: () => this.setState({ tab: t[0] }) }));
+    const SECT = { '情報技術': '#4ea2ff', '通信サービス': '#a78bfa', '一般消費財': '#f0a33a', 'ヘルスケア': '#2dd4bf', '金融': '#e2c26b' };
+    const W = [
+      ['AVGO', 'Broadcom', '情報技術', 'US', 352.1, 6.84, '18.2M', 386.5, 138.1, 400, 32.5, 11.8, 0.7, '1.66兆$', '12/11', 'AI向けASIC'],
+      ['AMD', 'Advanced Micro Devices', '情報技術', 'US', 238.6, -4.12, '52.4M', 267.1, 76.5, 260, 41.2, 6.1, 0, '3,870億$', '11/04', ''],
+      ['TSM', 'TSMC ADR', '情報技術', 'US', 301.4, 2.95, '11.6M', 311.4, 134.3, null, 24.8, 7.9, 1.1, '1.56兆$', '01/15', ''],
+      ['8035', '東京エレクトロン', '情報技術', 'JP', 31250, 640, '2.1M', 35960, 19275, 34000, 27.3, 7.4, 1.6, '14.7兆円', '11/12', '押し目待ち'],
+      ['ASML', 'ASML ADR', '情報技術', 'US', 1012.8, -8.4, '1.4M', 1048.2, 578.5, null, 36.1, 17.2, 0.7, '3,970億$', '01/28', ''],
+      ['6857', 'アドバンテスト', '情報技術', 'JP', 18420, -385, '6.8M', 19890, 4720, null, 52.4, 18.5, 0.3, '13.6兆円', '10/29', ''],
+      ['GOOGL', 'Alphabet', '通信サービス', 'US', 252.3, 1.45, '28.9M', 256.7, 140.5, 270, 26.1, 8.2, 0.3, '3.05兆$', '10/28', ''],
+      ['META', 'Meta Platforms', '通信サービス', 'US', 733.4, -5.62, '9.7M', 796.3, 479.8, 800, 26.9, 9.5, 0.3, '1.84兆$', '10/29', '設備投資の伸び'],
+      ['AMZN', 'Amazon.com', '一般消費財', 'US', 221.8, 0.92, '35.1M', 242.5, 161.4, 250, 33.7, 7.0, 0, '2.37兆$', '10/30', ''],
+      ['9984', 'ソフトバンクG', '一般消費財', 'JP', 24180, 910, '15.3M', 25250, 5720, null, 18.6, 3.2, 0.2, '35.5兆円', '11/11', ''],
+      ['LLY', 'Eli Lilly', 'ヘルスケア', 'US', 812.5, 10.3, '3.2M', 972.5, 623.8, 900, 52.8, 41.6, 0.7, '7,690億$', '10/30', '肥満症薬'],
+      ['JPM', 'JPMorgan Chase', '金融', 'US', 301.2, -1.08, '8.4M', 318.0, 202.2, null, 15.4, 2.5, 1.9, '8,280億$', '01/13', ''],
+      ['8316', '三井住友FG', '金融', 'JP', 4185, 62, '9.9M', 4310, 2860, 4500, 13.2, 1.1, 3.3, '16.5兆円', '11/14', '']
+    ];
+    const spark = (seed, trend) => {
+      const p = [];
+      for (let i = 0; i <= 20; i++) {
+        const y = 9 - trend * (i / 20) * 5 + Math.sin(i * 1.1 + seed) * 3 + Math.sin(i * 0.43 + seed * 3) * 2;
+        p.push((i === 0 ? 'M' : 'L') + (i * 4) + ' ' + Math.max(1, Math.min(17, y)).toFixed(1));
+      }
+      return p.join(' ');
+    };
+    const rowsOf = (sec) => W.filter((w) => w[2] === sec).map((w, i) => {
+      const jp = w[3] === 'JP';
+      const d = jp ? 0 : 2;
+      const pre = jp ? '¥' : '$';
+      const pct = (w[5] / (w[4] - w[5])) * 100;
+      const tgt = w[9];
+      const toTgt = tgt ? ((tgt - w[4]) / w[4]) * 100 : null;
+      return {
+        code: w[0], name: w[1], px: pre + f(w[4], d), chg: s(w[5], d), pct: s(pct, 2) + '%', color: col(w[5]), vol: w[6],
+        spark: spark(w[0].charCodeAt(0) + i, w[5] > 0 ? 1 : -1),
+        hi: f(w[7], d), lo: f(w[8], d), fromHi: s(((w[4] - w[7]) / w[7]) * 100, 1) + '%',
+        tgt: tgt ? f(tgt, d) : '未設定', tgtStyle: tgt ? '' : 'color: #8a96a6',
+        toTgt: toTgt === null ? '—' : s(toTgt, 1) + '%', toTgtStyle: toTgt === null ? 'color: #8a96a6' : (toTgt <= 3 ? 'color: #f5b955; font-weight: 600' : 'color: #c3ccd8'),
+        per: f(w[10], 1), pbr: f(w[11], 1), yld: w[12] ? f(w[12], 1) + '%' : '—', cap: w[13], earn: w[14], memo: w[15]
+      };
+    });
+    const groups = Object.keys(SECT).map((k) => {
+      const rows = rowsOf(k);
+      return { label: k, color: SECT[k], count: rows.length + '銘柄', rows };
+    });
+    return { updown, density: this.props.density ?? 'compact', tabs, groups };
+  }
+}
+</script>
+</body>
+</html>

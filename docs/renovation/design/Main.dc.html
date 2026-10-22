@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ホーム — Portfolio Manager</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0f14}
+a{color:#7fb3ff;text-decoration:none}a:hover{color:#b3d1ff}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.t{width:100%;border-collapse:collapse;font-size:12px}
+.t th{position:sticky;top:0;background:#161c25;color:#9aa6b6;font-weight:500;text-align:left;padding:0 8px;height:24px;border-bottom:1px solid #232b36;white-space:nowrap}
+.t td{padding:0 8px;border-bottom:1px solid #1b222c;white-space:nowrap}
+.t.compact td{height:24px}.t.standard td{height:32px}
+.tr{display:grid;align-items:center;border-bottom:1px solid #1b222c}
+.tr>div{padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hold .tr{grid-template-columns:64px minmax(110px,1.6fr) 84px 72px 104px 96px 72px 64px}
+.mov .tr{grid-template-columns:64px minmax(90px,1fr) 72px 88px}
+.th{position:sticky;top:0;z-index:1;height:26px;background:#161c25;color:#9aa6b6;font-weight:500;border-bottom:1px solid #232b36}
+.compact .tr:not(.th){height:24px}.standard .tr:not(.th){height:32px}
+.tot{background:#161c25;font-weight:600;border-top:1px solid #2c3644}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column; background: #0b0f14; color: #d8dee7; font-family: Inter, 'Noto Sans JP', sans-serif; font-size: 12px; line-height: 1.4">
+<dc-import name="TopBar" hint-size="100%,40px"></dc-import>
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; min-height: 0">
+<div style="flex: 1 1 160px; max-width: 100%; display: flex">
+<dc-import name="SideNav" current="home" hint-size="168px,100%"></dc-import>
+</div>
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px">
+
+<section aria-label="資産サマリー" style="display: flex; flex-wrap: wrap; background: #11161d; border: 1px solid #232b36; border-radius: 4px">
+<div style="flex: 1 1 150px; padding: 8px 12px; border-right: 1px solid #232b36">
+<div style="color: #9aa6b6; font-size: 11px">総資産（円）</div>
+<div class="num" style="text-align: left; font-size: 20px; font-weight: 600">{{sum.total}}</div>
+</div>
+<div style="flex: 1 1 130px; padding: 8px 12px; border-right: 1px solid #232b36">
+<div style="color: #9aa6b6; font-size: 11px">前日比</div>
+<div class="num" style="text-align: left; font-size: 15px; font-weight: 600; color: {{sum.dayColor}}">{{sum.day}}</div>
+<div class="num" style="text-align: left; font-size: 11px; color: {{sum.dayColor}}">{{sum.dayPct}}</div>
+</div>
+<div style="flex: 1 1 130px; padding: 8px 12px; border-right: 1px solid #232b36">
+<div style="color: #9aa6b6; font-size: 11px">評価損益</div>
+<div class="num" style="text-align: left; font-size: 15px; font-weight: 600; color: {{sum.plColor}}">{{sum.pl}}</div>
+<div class="num" style="text-align: left; font-size: 11px; color: {{sum.plColor}}">{{sum.plPct}}</div>
+</div>
+<div style="flex: 1 1 120px; padding: 8px 12px; border-right: 1px solid #232b36">
+<div style="color: #9aa6b6; font-size: 11px">米国株</div>
+<div class="num" style="text-align: left; font-size: 14px">{{sum.us}}</div>
+<div style="font-size: 11px; color: #9aa6b6">{{sum.usShare}}</div>
+</div>
+<div style="flex: 1 1 120px; padding: 8px 12px; border-right: 1px solid #232b36">
+<div style="color: #9aa6b6; font-size: 11px">日本株</div>
+<div class="num" style="text-align: left; font-size: 14px">{{sum.jp}}</div>
+<div style="font-size: 11px; color: #9aa6b6">{{sum.jpShare}}</div>
+</div>
+<div style="flex: 1 1 120px; padding: 8px 12px; border-right: 1px solid #232b36">
+<div style="color: #9aa6b6; font-size: 11px">FX</div>
+<div class="num" style="text-align: left; font-size: 14px">{{sum.fx}}</div>
+<div style="font-size: 11px; color: #9aa6b6">{{sum.fxShare}}</div>
+</div>
+<div style="flex: 1 1 110px; padding: 8px 12px">
+<div style="color: #9aa6b6; font-size: 11px">USD/JPY</div>
+<div class="num" style="text-align: left; font-size: 14px">154.820</div>
+<div class="num" style="text-align: left; font-size: 11px; color: {{c.up}}">+0.630（+0.41%）</div>
+</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 4px">
+<section aria-labelledby="h-hold" style="flex: 7 1 520px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px; display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-bottom: 1px solid #232b36">
+<h2 id="h-hold" style="margin: 0; font-size: 12px; font-weight: 600">保有銘柄</h2>
+<span style="color: #9aa6b6">7銘柄</span>
+<span style="flex: 1"></span>
+<a href="Holdings.dc.html">すべての列を表示 →</a>
+</div>
+<div style="overflow-x: auto">
+<div role="table" aria-label="保有銘柄" class="hold {{density}}" style="min-width: 680px">
+<div role="row" class="tr th"><div role="columnheader">コード</div><div role="columnheader">銘柄名</div><div role="columnheader" class="num">現在値</div><div role="columnheader" class="num">前日比%</div><div role="columnheader" class="num">評価額（円）</div><div role="columnheader" class="num">評価損益</div><div role="columnheader" class="num">損益%</div><div role="columnheader" class="num">構成比</div></div>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+<div role="row" class="tr"><div role="cell" style="color: #9aa6b6">{{r.code}}</div><div role="cell">{{r.name}}</div><div role="cell" class="num">{{r.px}}</div><div role="cell" class="num" style="color: {{r.chgColor}}">{{r.chgPct}}</div><div role="cell" class="num">{{r.valJpy}}</div><div role="cell" class="num" style="color: {{r.plColor}}">{{r.pl}}</div><div role="cell" class="num" style="color: {{r.plColor}}">{{r.plPct}}</div><div role="cell" class="num">{{r.weight}}</div></div>
+</sc-for>
+<div role="row" class="tr tot"><div role="cell"></div><div role="cell">合計</div><div role="cell"></div><div role="cell" class="num" style="color: {{sum.dayColor}}">{{sum.dayPct}}</div><div role="cell" class="num">{{sum.total}}</div><div role="cell" class="num" style="color: {{sum.plColor}}">{{sum.pl}}</div><div role="cell" class="num" style="color: {{sum.plColor}}">{{sum.plPct}}</div><div role="cell" class="num">100.0%</div></div>
+</div>
+</div>
+</section>
+
+<section aria-labelledby="h-idx" style="flex: 5 1 360px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px">
+<div style="display: flex; align-items: center; height: 30px; padding: 0 10px; border-bottom: 1px solid #232b36">
+<h2 id="h-idx" style="margin: 0; font-size: 12px; font-weight: 600">主要指数・為替</h2>
+<span style="flex: 1"></span>
+<a href="Market.dc.html">マーケット →</a>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))">
+<sc-for list="{{indices}}" as="ix" hint-placeholder-count="6">
+<div style="padding: 8px 10px; border-bottom: 1px solid #1b222c; border-right: 1px solid #1b222c; display: flex; flex-direction: column; gap: 2px">
+<div style="display: flex; justify-content: space-between"><span style="font-weight: 500">{{ix.name}}</span><span class="num" style="color: {{ix.color}}">{{ix.pct}}</span></div>
+<div class="num" style="text-align: left; font-size: 15px; font-weight: 600">{{ix.val}}</div>
+<svg viewBox="0 0 160 32" width="100%" height="32" aria-hidden="true" preserveAspectRatio="none"><path d="{{ix.path}}" fill="none" stroke="{{ix.color}}" stroke-width="1.5"></path></svg>
+</div>
+</sc-for>
+</div>
+</section>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 4px">
+<section aria-labelledby="h-mov" style="flex: 1 1 260px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px">
+<div style="display: flex; align-items: center; height: 30px; padding: 0 10px; border-bottom: 1px solid #232b36"><h2 id="h-mov" style="margin: 0; font-size: 12px; font-weight: 600">今日の騰落（保有）</h2></div>
+<div role="table" aria-label="今日の騰落" class="mov {{density}}">
+<sc-for list="{{movers}}" as="m" hint-placeholder-count="7">
+<div role="row" class="tr"><div role="cell" style="color: #9aa6b6">{{m.code}}</div><div role="cell">{{m.name}}</div><div role="cell" class="num" style="color: {{m.chgColor}}">{{m.chgPct}}</div><div role="cell" class="num" style="color: {{m.chgColor}}">{{m.day}}</div></div>
+</sc-for>
+</div>
+</section>
+
+<section aria-labelledby="h-alloc" style="flex: 1 1 260px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px">
+<div style="display: flex; align-items: center; height: 30px; padding: 0 10px; border-bottom: 1px solid #232b36"><h2 id="h-alloc" style="margin: 0; font-size: 12px; font-weight: 600">配分</h2></div>
+<div style="padding: 10px; display: flex; flex-direction: column; gap: 10px">
+<div style="color: #9aa6b6; font-size: 11px">セクター別</div>
+<div style="display: flex; height: 10px; border-radius: 2px; overflow: hidden">
+<sc-for list="{{sectors}}" as="s" hint-placeholder-count="4"><div style="width: {{s.w}}; background: {{s.color}}"></div></sc-for>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px">
+<sc-for list="{{sectors}}" as="s" hint-placeholder-count="4">
+<div style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 2px; background: {{s.color}}"></span><span style="flex: 1">{{s.name}}</span><span class="num">{{s.pct}}</span></div>
+</sc-for>
+</div>
+<div style="color: #9aa6b6; font-size: 11px; margin-top: 4px">市場別</div>
+<div style="display: flex; height: 10px; border-radius: 2px; overflow: hidden">
+<sc-for list="{{markets}}" as="s" hint-placeholder-count="3"><div style="width: {{s.w}}; background: {{s.color}}"></div></sc-for>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 12px">
+<sc-for list="{{markets}}" as="s" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 2px; background: {{s.color}}"></span><span style="flex: 1">{{s.name}}</span><span class="num">{{s.pct}}</span></div>
+</sc-for>
+</div>
+</div>
+</section>
+
+<section aria-labelledby="h-earn" style="flex: 1 1 260px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px">
+<div style="display: flex; align-items: center; height: 30px; padding: 0 10px; border-bottom: 1px solid #232b36"><h2 id="h-earn" style="margin: 0; font-size: 12px; font-weight: 600">決算予定（今後3週間）</h2></div>
+<table class="t {{density}}">
+<tbody>
+<tr><td class="num" style="text-align: left; width: 64px">10/28 水</td><td style="color: #9aa6b6">MSFT</td><td>Microsoft</td><td style="color: #9aa6b6">保有</td></tr>
+<tr><td class="num" style="text-align: left">10/30 金</td><td style="color: #9aa6b6">AAPL</td><td>Apple</td><td style="color: #9aa6b6">保有</td></tr>
+<tr><td class="num" style="text-align: left">11/05 木</td><td style="color: #9aa6b6">7203</td><td>トヨタ自動車</td><td style="color: #9aa6b6">保有</td></tr>
+<tr><td class="num" style="text-align: left">11/11 水</td><td style="color: #9aa6b6">6758</td><td>ソニーグループ</td><td style="color: #9aa6b6">保有</td></tr>
+<tr><td class="num" style="text-align: left">11/13 金</td><td style="color: #9aa6b6">8306</td><td>三菱UFJ FG</td><td style="color: #9aa6b6">保有</td></tr>
+<tr><td class="num" style="text-align: left">11/19 木</td><td style="color: #9aa6b6">NVDA</td><td>NVIDIA</td><td style="color: #9aa6b6">保有</td></tr>
+</tbody>
+</table>
+</section>
+
+<section aria-labelledby="h-news" style="flex: 1 1 260px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px">
+<div style="display: flex; align-items: center; height: 30px; padding: 0 10px; border-bottom: 1px solid #232b36"><h2 id="h-news" style="margin: 0; font-size: 12px; font-weight: 600">最新ニュース</h2><span style="flex: 1"></span><a href="News.dc.html">一覧 →</a></div>
+<ul style="list-style: none; margin: 0; padding: 0">
+<li style="display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #1b222c"><span class="num" style="color: #9aa6b6">21:32</span><span style="color: #7fb3ff">NVDA</span><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[ニュースの見出しが1行で入る]</span></li>
+<li style="display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #1b222c"><span class="num" style="color: #9aa6b6">21:05</span><span style="color: #7fb3ff">7203</span><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[ニュースの見出しが1行で入る]</span></li>
+<li style="display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #1b222c"><span class="num" style="color: #9aa6b6">20:48</span><span style="color: #7fb3ff">AAPL</span><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[ニュースの見出しが1行で入る]</span></li>
+<li style="display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #1b222c"><span class="num" style="color: #9aa6b6">19:57</span><span style="color: #7fb3ff">8306</span><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[ニュースの見出しが1行で入る]</span></li>
+<li style="display: flex; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #1b222c"><span class="num" style="color: #9aa6b6">18:20</span><span style="color: #7fb3ff">MSFT</span><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[ニュースの見出しが1行で入る]</span></li>
+<li style="display: flex; gap: 8px; padding: 6px 10px"><span class="num" style="color: #9aa6b6">17:41</span><span style="color: #7fb3ff">6758</span><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[ニュースの見出しが1行で入る]</span></li>
+</ul>
+</section>
+</div>
+
+</main>
+</div>
+<dc-import name="Ticker" updown="{{updown}}" hint-size="100%,48px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"updown":{"editor":"enum","options":["日本式","米国式"],"default":"日本式","section":"表示"},"density":{"editor":"enum","options":["compact","standard"],"default":"compact","section":"表示"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const updown = this.props.updown ?? '日本式';
+    const c = updown === '米国式' ? { up: '#2fc677', down: '#ff5c5c' } : { up: '#ff5c5c', down: '#4ea2ff' };
+    const col = (n) => (n > 0 ? c.up : n < 0 ? c.down : '#9aa6b6');
+    const f = (n, d) => n.toLocaleString('ja-JP', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const s = (n, d) => (n > 0 ? '+' : '') + f(n, d);
+    const RATE = 154.82;
+    const RAW = [
+      { code: 'NVDA', name: 'NVIDIA', mkt: 'US', sector: '情報技術', qty: 50, cost: 98.5, px: 142.5, chg: 3.25 },
+      { code: 'AAPL', name: 'Apple', mkt: 'US', sector: '情報技術', qty: 100, cost: 175, px: 185.2, chg: -1.8 },
+      { code: 'MSFT', name: 'Microsoft', mkt: 'US', sector: '情報技術', qty: 30, cost: 380, px: 415.8, chg: 5.2 },
+      { code: '7203', name: 'トヨタ自動車', mkt: 'JP', sector: '一般消費財', qty: 300, cost: 3000, px: 2850, chg: -50 },
+      { code: '6758', name: 'ソニーグループ', mkt: 'JP', sector: '一般消費財', qty: 100, cost: 12500, px: 13200, chg: 280 },
+      { code: '8306', name: '三菱UFJ FG', mkt: 'JP', sector: '金融', qty: 500, cost: 1200, px: 1850, chg: 45 },
+      { code: 'USDJPY', name: '米ドル/円', mkt: 'FX', sector: 'FX', qty: 10000, cost: 152.35, px: 154.82, chg: 0.63 }
+    ];
+    const calc = RAW.map((h) => {
+      const fx = h.mkt === 'US' ? RATE : 1;
+      const valJpy = h.qty * h.px * fx;
+      const costJpy = h.qty * h.cost * fx;
+      const pl = valJpy - costJpy;
+      return { ...h, valJpy, costJpy, pl, plPct: (pl / costJpy) * 100, day: h.qty * h.chg * fx, chgPct: (h.chg / (h.px - h.chg)) * 100, dec: h.mkt === 'JP' ? 0 : h.mkt === 'FX' ? 3 : 2 };
+    });
+    const total = calc.reduce((a, h) => a + h.valJpy, 0);
+    const cost = calc.reduce((a, h) => a + h.costJpy, 0);
+    const day = calc.reduce((a, h) => a + h.day, 0);
+    const byMkt = (m) => calc.filter((h) => h.mkt === m).reduce((a, h) => a + h.valJpy, 0);
+    const pct = (v) => f((v / total) * 100, 1) + '%';
+    const sum = {
+      total: '¥' + f(total, 0), day: s(day, 0), dayPct: s((day / (total - day)) * 100, 2) + '%', dayColor: col(day),
+      pl: s(total - cost, 0), plPct: s(((total - cost) / cost) * 100, 2) + '%', plColor: col(total - cost),
+      us: '¥' + f(byMkt('US'), 0), usShare: '構成比 ' + pct(byMkt('US')),
+      jp: '¥' + f(byMkt('JP'), 0), jpShare: '構成比 ' + pct(byMkt('JP')),
+      fx: '¥' + f(byMkt('FX'), 0), fxShare: '構成比 ' + pct(byMkt('FX'))
+    };
+    const rows = calc.map((h) => ({
+      code: h.code, name: h.name, px: f(h.px, h.dec), chgPct: s(h.chgPct, 2) + '%', chgColor: col(h.chg),
+      valJpy: f(h.valJpy, 0), pl: s(h.pl, 0), plPct: s(h.plPct, 2) + '%', plColor: col(h.pl), weight: pct(h.valJpy)
+    }));
+    const movers = [...calc].sort((a, b) => b.chgPct - a.chgPct).map((h) => ({ code: h.code, name: h.name, chgPct: s(h.chgPct, 2) + '%', chgColor: col(h.chg), day: s(h.day, 0) }));
+    const palette = ['#4ea2ff', '#f0a33a', '#a78bfa', '#2dd4bf', '#94a3b8'];
+    const group = (key) => {
+      const m = {};
+      calc.forEach((h) => { m[h[key]] = (m[h[key]] || 0) + h.valJpy; });
+      return Object.keys(m).sort((a, b) => m[b] - m[a]).map((k, i) => ({ name: k, w: ((m[k] / total) * 100).toFixed(2) + '%', pct: pct(m[k]), color: palette[i % palette.length] }));
+    };
+    const mktNames = { US: '米国株', JP: '日本株', FX: 'FX' };
+    const markets = group('mkt').map((m) => ({ ...m, name: mktNames[m.name] }));
+    const spark = (seed, trend) => {
+      const pts = [];
+      for (let i = 0; i <= 30; i++) {
+        const y = 16 - trend * (i / 30) * 10 + Math.sin(i * 0.9 + seed) * 4 + Math.sin(i * 0.37 + seed * 2) * 3;
+        pts.push((i === 0 ? 'M' : 'L') + (i * 160 / 30).toFixed(1) + ' ' + Math.max(2, Math.min(30, y)).toFixed(1));
+      }
+      return pts.join(' ');
+    };
+    const IDX = [
+      { name: '日経225', val: '48,350.12', chg: 0.86, seed: 1 },
+      { name: 'TOPIX', val: '3,215.40', chg: 0.57, seed: 2 },
+      { name: 'S&P500', val: '6,712.30', chg: -0.32, seed: 3 },
+      { name: 'NASDAQ', val: '22,904.75', chg: -0.43, seed: 4 },
+      { name: 'USD/JPY', val: '154.820', chg: 0.41, seed: 5 },
+      { name: '米10年債', val: '4.112%', chg: -0.75, seed: 6 }
+    ];
+    const indices = IDX.map((x) => ({ name: x.name, val: x.val, pct: s(x.chg, 2) + '%', color: col(x.chg), path: spark(x.seed, x.chg > 0 ? 1 : -1) }));
+    return { c, updown, density: this.props.density ?? 'compact', sum, rows, movers, sectors: group('sector'), markets, indices };
+  }
+}
+</script>
+</body>
+</html>

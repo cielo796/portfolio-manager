@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>銘柄詳細 — Portfolio Manager</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0f14}
+a{color:#7fb3ff;text-decoration:none}a:hover{color:#b3d1ff}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.btn{height:24px;padding:0 9px;background:#1d2530;color:#c3ccd8;border:1px solid #2c3644;border-radius:3px;font:inherit;cursor:pointer}
+.btn.on{background:#2a2214;color:#f5b955;border-color:#6b5226}
+.li{display:grid;grid-template-columns:52px minmax(0,1fr) 72px 58px;align-items:center;height:24px;padding:0 8px;border-bottom:1px solid #1b222c;color:#d8dee7;text-decoration:none}
+.li>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li:hover{background:#161c25}
+.kv{display:flex;justify-content:space-between;gap:8px;height:22px;align-items:center;border-bottom:1px solid #1b222c}
+.kv dt{color:#9aa6b6}.kv dd{margin:0;font-variant-numeric:tabular-nums}
+.ptab{height:28px;padding:0 12px;background:transparent;color:#9aa6b6;border:0;border-bottom:2px solid transparent;font:inherit;cursor:pointer}
+.ptab.on{color:#f5b955;border-bottom-color:#f0a33a;font-weight:600}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column; background: #0b0f14; color: #d8dee7; font-family: Inter, 'Noto Sans JP', sans-serif; font-size: 12px; line-height: 1.4">
+<dc-import name="TopBar" hint-size="100%,40px"></dc-import>
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; min-height: 0">
+<div style="flex: 1 1 160px; max-width: 100%; display: flex">
+<dc-import name="SideNav" current="detail" hint-size="168px,100%"></dc-import>
+</div>
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; align-content: flex-start">
+
+<section aria-labelledby="d-list" style="flex: 1 1 220px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px; display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; gap: 2px; padding: 0 6px; border-bottom: 1px solid #232b36">
+<h2 id="d-list" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">銘柄リスト</h2>
+<button type="button" class="ptab on">保有</button><button type="button" class="ptab">メイン</button><button type="button" class="ptab">サブ2</button>
+</div>
+<div style="display: grid; grid-template-columns: 52px minmax(0,1fr) 72px 58px; height: 22px; align-items: center; padding: 0 8px; color: #9aa6b6; background: #161c25; border-bottom: 1px solid #232b36"><span>コード</span><span>銘柄名</span><span class="num">現在値</span><span class="num">前日比</span></div>
+<sc-for list="{{list}}" as="l" hint-placeholder-count="7">
+<a href="Detail.dc.html" class="li" style="{{l.style}}"><span style="color: #9aa6b6">{{l.code}}</span><span>{{l.name}}</span><span class="num">{{l.px}}</span><span class="num" style="color: {{l.color}}">{{l.pct}}</span></a>
+</sc-for>
+</section>
+
+<section aria-labelledby="d-title" style="flex: 999 1 560px; min-width: 0; background: #11161d; border: 1px solid #232b36; border-radius: 4px; display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding: 8px 12px; border-bottom: 1px solid #232b36">
+<div style="display: flex; align-items: baseline; gap: 8px"><span style="color: #9aa6b6">NVDA</span><h1 id="d-title" style="margin: 0; font-size: 15px; font-weight: 600">NVIDIA</h1><span style="color: #9aa6b6">米国・情報技術・保有中</span></div>
+<div style="display: flex; align-items: baseline; gap: 8px"><span class="num" style="font-size: 22px; font-weight: 600">$142.50</span><span class="num" style="color: {{c.up}}; font-size: 13px">+3.25（+2.33%）</span></div>
+<dl style="display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; color: #9aa6b6">
+<div style="display: flex; gap: 4px"><dt>始値</dt><dd class="num" style="margin: 0; color: #d8dee7">{{ohlc.o}}</dd></div>
+<div style="display: flex; gap: 4px"><dt>高値</dt><dd class="num" style="margin: 0; color: #d8dee7">{{ohlc.h}}</dd></div>
+<div style="display: flex; gap: 4px"><dt>安値</dt><dd class="num" style="margin: 0; color: #d8dee7">{{ohlc.l}}</dd></div>
+<div style="display: flex; gap: 4px"><dt>前日終値</dt><dd class="num" style="margin: 0; color: #d8dee7">139.25</dd></div>
+<div style="display: flex; gap: 4px"><dt>出来高</dt><dd class="num" style="margin: 0; color: #d8dee7">{{ohlc.v}}</dd></div>
+</dl>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid #232b36">
+<div role="group" aria-label="期間" style="display: flex; gap: 2px"><button type="button" class="btn">1M</button><button type="button" class="btn on">3M</button><button type="button" class="btn">6M</button><button type="button" class="btn">1Y</button><button type="button" class="btn">5Y</button></div>
+<div role="group" aria-label="足" style="display: flex; gap: 2px; margin-left: 8px"><button type="button" class="btn on">日足</button><button type="button" class="btn">週足</button><button type="button" class="btn">月足</button></div>
+<span style="width: 1px; height: 18px; background: #2c3644; margin: 0 4px"></span>
+<button type="button" class="btn on"><span style="color: #f5b955">―</span> MA5</button>
+<button type="button" class="btn on"><span style="color: #a78bfa">―</span> MA25</button>
+<button type="button" class="btn on"><span style="color: #2dd4bf">―</span> MA75</button>
+<button type="button" class="btn on"><span style="color: #f0a33a">┄</span> 取得単価</button>
+<button type="button" class="btn">目標価格</button>
+<button type="button" class="btn on">▲▼ 売買記録</button>
+</div>
+<div style="padding: 6px 4px 0 12px">
+<svg viewBox="0 0 800 360" width="100%" role="img" aria-label="NVDAの日足チャート（3か月）、移動平均と出来高、取得単価ライン">
+<g stroke="#1b222c" stroke-width="1">
+<line x1="0" x2="744" y1="{{ticks.a.y}}" y2="{{ticks.a.y}}"></line><line x1="0" x2="744" y1="{{ticks.b.y}}" y2="{{ticks.b.y}}"></line><line x1="0" x2="744" y1="{{ticks.c.y}}" y2="{{ticks.c.y}}"></line><line x1="0" x2="744" y1="{{ticks.d.y}}" y2="{{ticks.d.y}}"></line><line x1="0" x2="744" y1="{{ticks.e.y}}" y2="{{ticks.e.y}}"></line>
+<line x1="0" x2="744" y1="276" y2="276"></line>
+</g>
+<g fill="#9aa6b6" font-size="11" font-family="Inter, sans-serif">
+<text x="752" y="{{ticks.a.ty}}">{{ticks.a.v}}</text><text x="752" y="{{ticks.b.ty}}">{{ticks.b.v}}</text><text x="752" y="{{ticks.c.ty}}">{{ticks.c.v}}</text><text x="752" y="{{ticks.d.ty}}">{{ticks.d.v}}</text><text x="752" y="{{ticks.e.ty}}">{{ticks.e.v}}</text>
+<text x="752" y="290">出来高</text>
+<text x="{{months.a.x}}" y="356">{{months.a.t}}</text><text x="{{months.b.x}}" y="356">{{months.b.t}}</text><text x="{{months.c.x}}" y="356">{{months.c.t}}</text>
+</g>
+<path d="{{cs.volUp}}" fill="{{c.up}}" fill-opacity="0.45"></path>
+<path d="{{cs.volDn}}" fill="{{c.down}}" fill-opacity="0.45"></path>
+<path d="{{cs.wickUp}}" stroke="{{c.up}}" stroke-width="1"></path>
+<path d="{{cs.wickDn}}" stroke="{{c.down}}" stroke-width="1"></path>
+<path d="{{cs.bodyUp}}" fill="{{c.up}}"></path>
+<path d="{{cs.bodyDn}}" fill="{{c.down}}"></path>
+<path d="{{cs.ma5}}" fill="none" stroke="#f5b955" stroke-width="1.2"></path>
+<path d="{{cs.ma25}}" fill="none" stroke="#a78bfa" stroke-width="1.2"></path>
+<path d="{{cs.ma75}}" fill="none" stroke="#2dd4bf" stroke-width="1.2"></path>
+<line x1="0" x2="744" y1="{{cs.costY}}" y2="{{cs.costY}}" stroke="#f0a33a" stroke-dasharray="5 4"></line>
+<rect x="746" y="{{cs.costLabelY}}" width="52" height="16" rx="2" fill="#f0a33a"></rect>
+<text x="750" y="{{cs.costTextY}}" font-size="11" fill="#1a1205" font-family="Inter, sans-serif">98.50</text>
+<rect x="746" y="{{cs.lastLabelY}}" width="52" height="16" rx="2" fill="{{c.up}}"></rect>
+<text x="750" y="{{cs.lastTextY}}" font-size="11" fill="#0b0f14" font-weight="600" font-family="Inter, sans-serif">142.50</text>
+<path d="{{cs.buyMarks}}" fill="#7fb3ff"></path>
+</svg>
+</div>
+<div role="tablist" aria-label="銘柄の情報" style="display: flex; gap: 2px; padding: 0 8px; border-top: 1px solid #232b36; border-bottom: 1px solid #232b36; margin-top: 4px">
+<button type="button" role="tab" aria-selected="true" class="ptab on">ニュース</button>
+<button type="button" role="tab" aria-selected="false" class="ptab">メモ</button>
+<button type="button" role="tab" aria-selected="false" class="ptab">トレードアイデア</button>
+<button type="button" role="tab" aria-selected="false" class="ptab">売買記録</button>
+</div>
+<ul style="list-style: none; margin: 0; padding: 0">
+<li style="display: flex; gap: 10px; padding: 5px 12px; border-bottom: 1px solid #1b222c"><span class="num" style="color: #9aa6b6">10/22 21:32</span><span style="color: #9aa6b6; width: 90px">[配信元]</span><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[ニュースの見出しが1行で入る]</span></li>
+<li style="display: flex; gap: 10px; padding: 5px 12px; border-bottom: 1px solid #1b222c"><span class="num" style="color: #9aa6b6">10/22 18:05</span><span style="color: #9aa6b6; width: 90px">[配信元]</span><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[ニュースの見出しが1行で入る]</span></li>
+<li style="display: flex; gap: 10px; padding: 5px 12px; border-bottom: 1px solid #1b222c"><span class="num" style="color: #9aa6b6">10/21 23:47</span><span style="color: #9aa6b6; width: 90px">[配信元]</span><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[ニュースの見出しが1行で入る]</span></li>
+<li style="display: flex; gap: 10px; padding: 5px 12px"><span class="num" style="color: #9aa6b6">10/21 07:12</span><span style="color: #9aa6b6; width: 90px">[配信元]</span><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[ニュースの見出しが1行で入る]</span></li>
+</ul>
+</section>
+
+<aside aria-label="指標と保有情報" style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<section aria-labelledby="d-hold" style="background: #11161d; border: 1px solid #232b36; border-radius: 4px; padding: 0 10px 6px">
+<h2 id="d-hold" style="margin: 0; height: 30px; display: flex; align-items: center; font-size: 12px; font-weight: 600">保有情報</h2>
+<dl style="margin: 0">
+<div class="kv"><dt>保有数量</dt><dd>50株</dd></div>
+<div class="kv"><dt>取得単価</dt><dd>$98.50</dd></div>
+<div class="kv"><dt>評価額</dt><dd>{{hold.valUsd}}</dd></div>
+<div class="kv"><dt>評価額（円）</dt><dd>{{hold.valJpy}}</dd></div>
+<div class="kv"><dt>評価損益</dt><dd style="color: {{hold.color}}">{{hold.pl}}</dd></div>
+<div class="kv"><dt>損益率</dt><dd style="color: {{hold.color}}">{{hold.plPct}}</dd></div>
+<div class="kv"><dt>当日損益</dt><dd style="color: {{c.up}}">{{hold.day}}</dd></div>
+</dl>
+</section>
+<section aria-labelledby="d-fund" style="background: #11161d; border: 1px solid #232b36; border-radius: 4px; padding: 0 10px 6px">
+<div style="height: 30px; display: flex; align-items: center"><h2 id="d-fund" style="margin: 0; font-size: 12px; font-weight: 600">財務・バリュエーション</h2><span style="flex: 1"></span><span style="color: #9aa6b6; font-size: 11px">24時間キャッシュ</span></div>
+<dl style="margin: 0">
+<div class="kv"><dt>時価総額</dt><dd>3.47兆$</dd></div>
+<div class="kv"><dt>PER（実績／予想）</dt><dd>55.8／33.2</dd></div>
+<div class="kv"><dt>PBR</dt><dd>50.1</dd></div>
+<div class="kv"><dt>PSR</dt><dd>28.4</dd></div>
+<div class="kv"><dt>売上高成長率（前年同期）</dt><dd>+94.0%</dd></div>
+<div class="kv"><dt>営業利益率</dt><dd>62.1%</dd></div>
+<div class="kv"><dt>ROE</dt><dd>119.2%</dd></div>
+<div class="kv"><dt>自己資本比率</dt><dd>71.6%</dd></div>
+<div class="kv"><dt>ネットキャッシュ</dt><dd>431億$</dd></div>
+<div class="kv"><dt>配当利回り</dt><dd>0.03%</dd></div>
+<div class="kv" style="border-bottom: 0"><dt>次回決算</dt><dd style="color: #f5b955">11/19（木）</dd></div>
+</dl>
+</section>
+</aside>
+
+</main>
+</div>
+<dc-import name="Ticker" updown="{{updown}}" hint-size="100%,48px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"updown":{"editor":"enum","options":["日本式","米国式"],"default":"日本式","section":"表示"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const updown = this.props.updown ?? '日本式';
+    const c = updown === '米国式' ? { up: '#2fc677', down: '#ff5c5c' } : { up: '#ff5c5c', down: '#4ea2ff' };
+    const col = (n) => (n > 0 ? c.up : n < 0 ? c.down : '#9aa6b6');
+    const f = (n, d) => n.toLocaleString('ja-JP', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const s = (n, d) => (n > 0 ? '+' : '') + f(n, d);
+    const N = 64;
+    const closes = [];
+    let p = 104;
+    for (let i = 0; i < N; i++) {
+      const drift = (142.5 / 104) ** (1 / N);
+      p = p * drift * (1 + Math.sin(i * 0.7) * 0.018 + Math.sin(i * 0.23 + 1) * 0.012);
+      closes.push(p);
+    }
+    const k = 142.5 / closes[N - 1];
+    const cl = closes.map((v) => v * k);
+    const candles = cl.map((close, i) => {
+      const open = i === 0 ? close * 0.99 : cl[i - 1] * (1 + Math.sin(i * 1.9) * 0.006);
+      const hi = Math.max(open, close) * (1 + 0.004 + Math.abs(Math.sin(i * 2.3)) * 0.012);
+      const lo = Math.min(open, close) * (1 - 0.004 - Math.abs(Math.cos(i * 1.7)) * 0.012);
+      const vol = 160 + Math.abs(Math.sin(i * 0.9)) * 140 + (i % 7 === 0 ? 80 : 0);
+      return { open, close, hi, lo, vol };
+    });
+    const lowAll = Math.min(98.5, ...candles.map((d) => d.lo)) * 0.97;
+    const highAll = Math.max(...candles.map((d) => d.hi)) * 1.02;
+    const Y = (v) => 10 + (1 - (v - lowAll) / (highAll - lowAll)) * 250;
+    const step = 744 / N;
+    const bw = step * 0.62;
+    const X = (i) => i * step + step / 2;
+    const maxVol = Math.max(...candles.map((d) => d.vol));
+    let wickUp = '', wickDn = '', bodyUp = '', bodyDn = '', volUp = '', volDn = '';
+    candles.forEach((d, i) => {
+      const x = X(i).toFixed(1);
+      const up = d.close >= d.open;
+      const w = 'M' + x + ' ' + Y(d.hi).toFixed(1) + 'V' + Y(d.lo).toFixed(1);
+      const top = Y(Math.max(d.open, d.close));
+      const h = Math.max(1, Y(Math.min(d.open, d.close)) - top);
+      const b = 'M' + (X(i) - bw / 2).toFixed(1) + ' ' + top.toFixed(1) + 'h' + bw.toFixed(1) + 'v' + h.toFixed(1) + 'h' + (-bw).toFixed(1) + 'z';
+      const vh = (d.vol / maxVol) * 64;
+      const v = 'M' + (X(i) - bw / 2).toFixed(1) + ' ' + (346 - vh).toFixed(1) + 'h' + bw.toFixed(1) + 'v' + vh.toFixed(1) + 'h' + (-bw).toFixed(1) + 'z';
+      if (up) { wickUp += w; bodyUp += b; volUp += v; } else { wickDn += w; bodyDn += b; volDn += v; }
+    });
+    const ext = [];
+    let q = 96;
+    for (let i = 0; i < 75; i++) { q = q * (1 + Math.sin(i * 0.31) * 0.004 + 0.001); ext.push(q); }
+    const all = ext.map((v) => v * (cl[0] / ext[74])).concat(cl);
+    const ma = (n) => cl.map((_, i) => {
+      const j = i + 75;
+      const sl = all.slice(j - n + 1, j + 1);
+      return sl.reduce((a, b) => a + b, 0) / sl.length;
+    }).map((v, i) => (i === 0 ? 'M' : 'L') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' ');
+    const buyIdx = [9, 31];
+    const buyMarks = buyIdx.map((i) => {
+      const y = Y(candles[i].lo) + 8;
+      return 'M' + X(i).toFixed(1) + ' ' + y.toFixed(1) + 'l5 8h-10z';
+    }).join('');
+    const tv = [0, 1, 2, 3, 4].map((t) => lowAll + ((highAll - lowAll) * (t + 0.5)) / 5);
+    const tick = (v) => ({ y: Y(v).toFixed(1), ty: (Y(v) + 4).toFixed(1), v: f(v, 2) });
+    const costY = Y(98.5);
+    const lastY = Y(142.5);
+    const cs = {
+      wickUp, wickDn, bodyUp, bodyDn, volUp, volDn, ma5: ma(5), ma25: ma(25), ma75: ma(75), buyMarks,
+      costY: costY.toFixed(1), costLabelY: (costY - 8).toFixed(1), costTextY: (costY + 4).toFixed(1),
+      lastLabelY: (lastY - 8).toFixed(1), lastTextY: (lastY + 4).toFixed(1)
+    };
+    const last = candles[N - 1];
+    const ohlc = { o: f(last.open, 2), h: f(last.hi, 2), l: f(last.lo, 2), v: f(last.vol * 1e6 / 1, 0) };
+    const RATE = 154.82;
+    const valUsd = 50 * 142.5;
+    const pl = (142.5 - 98.5) * 50 * RATE;
+    const hold = { valUsd: '$' + f(valUsd, 2), valJpy: '¥' + f(valUsd * RATE, 0), pl: s(pl, 0) + '円', plPct: s(((142.5 - 98.5) / 98.5) * 100, 2) + '%', color: col(pl), day: s(3.25 * 50 * RATE, 0) + '円' };
+    const L = [
+      ['NVDA', 'NVIDIA', 142.5, 3.25, 2], ['AAPL', 'Apple', 185.2, -1.8, 2], ['MSFT', 'Microsoft', 415.8, 5.2, 2],
+      ['7203', 'トヨタ自動車', 2850, -50, 0], ['6758', 'ソニーグループ', 13200, 280, 0], ['8306', '三菱UFJ FG', 1850, 45, 0], ['USDJPY', '米ドル/円', 154.82, 0.63, 3]
+    ];
+    const list = L.map((r) => ({ code: r[0], name: r[1], px: f(r[2], r[4]), pct: s((r[3] / (r[2] - r[3])) * 100, 2) + '%', color: col(r[3]), style: r[0] === 'NVDA' ? 'background: #1a2638' : '' }));
+    return {
+      updown, c, cs, ohlc, hold, list,
+      ticks: { a: tick(tv[4]), b: tick(tv[3]), c: tick(tv[2]), d: tick(tv[1]), e: tick(tv[0]) },
+      months: { a: { x: X(4).toFixed(0), t: '8月' }, b: { x: X(26).toFixed(0), t: '9月' }, c: { x: X(48).toFixed(0), t: '10月' } }
+    };
+  }
+}
+</script>
+</body>
+</html>
