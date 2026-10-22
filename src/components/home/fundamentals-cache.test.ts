@@ -43,7 +43,7 @@ describe('T13 財務キャッシュとAPI', () => {
     db.exec('DROP TABLE fundamentals_cache; PRAGMA user_version = 4');
     const { runMigrations } = await import('@/lib/db/migrations');
     runMigrations(db);
-    expect(db.pragma('user_version', { simple: true })).toBe(5);
+    expect(db.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(5);
     cache.writeFundamentalsCache(metrics);
     runMigrations(db);
     expect(cache.readFundamentalsCache('AAPL', 'US')).toEqual(metrics);

@@ -222,7 +222,8 @@ describe('同期スキーマと論理削除', () => {
   });
 
   it('全データ削除でも行を保持し、キャッシュを消してモック口座を再作成する', () => {
-    db.prepare(`INSERT INTO stock_prices VALUES ('ABC', 'US', 'ABC', 1, 0, 0, 'USD', ?)`).run(initialTime);
+    db.prepare(`INSERT INTO stock_prices (symbol, market, name, price, change, change_percent, currency, updated_at)
+      VALUES ('ABC', 'US', 'ABC', 1, 0, 0, 'USD', ?)`).run(initialTime);
     db.prepare(`INSERT INTO news_items VALUES ('news', 'ABC', '記事', NULL, 'source', 'https://example.com', NULL, ?, NULL)`).run(initialTime);
     vi.setSystemTime(laterTime);
     api.clearAllData();
