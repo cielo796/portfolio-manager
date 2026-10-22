@@ -1,0 +1,110 @@
+import 'server-only';
+
+import { randomUUID } from 'node:crypto';
+import { mkdir, readdir, unlink } from 'node:fs/promises';
+import path from 'node:path';
+import type Database from 'better-sqlite3';
+import type { SyncChanges, SyncConflict, SyncPeer, SyncResult, SyncTransport } from '@/types';
+import { applyChanges, collectChanges, tables } from './changes';
+import { assertIdle, duplicateDeviceMessage, state, SyncError, validTime } from './state';
+import { getDeviceId } from '@/lib/db/device';
+
+export async function backupDatabase(db: Database.Database): Promise<string> {
+  const directory = path.join(path.dirname(db.name), 'sync-backups');
+  await mkdir(directory, { recursive: true });
+  const filename = `portfolio-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}.db`;
+  const destination = path.join(directory, filename);
+  await db.backup(destination);
+  const files = (await readdir(directory)).filter((name) => /^portfolio-\d{4}-\d{2}-\d{2}T.*\.db$/.test(name)).sort();
+  for (const name of files.slice(0, Math.max(0, files.length - 10))) await unlink(path.join(directory, name));
+  return destination;
+}
+
+function overlap(value: string | null): string | null {
+  return value === null ? null : new Date(Date.parse(value) - 300_000).toISOString();
+}
+
+// 既存のmaintenanceはgetDb()専用のため、明示されたDBに同じ保持規則を適用する
+export function purgeDeletedRows(db: Database.Database): number {
+  const cutoff = new Date(Date.now() - 90 * 86_400_000).toISOString();
+  return db.transaction(() => {
+    let removed = 0;
+    for (const table of tables.filter((table) => table !== 'portfolios')) {
+      removed += db.prepare(`DELETE FROM ${table} WHERE deleted_at < ?`).run(cutoff).changes;
+    }
+    removed += db.prepare(`DELETE FROM portfolios WHERE deleted_at < ?
+      AND NOT EXISTS (SELECT 1 FROM holdings WHERE portfolio_id = portfolios.id)
+      AND NOT EXISTS (SELECT 1 FROM transactions WHERE portfolio_id = portfolios.id)`).run(cutoff).changes;
+    return removed;
+  })();
+}
+
+function mergeCanonical(changes: SyncChanges, corrections: SyncChanges) {
+  for (const table of tables) {
+    const ids = new Map(changes[table].map((row) => [row.id, row]));
+    for (const row of corrections[table]) ids.set(row.id, row);
+    changes[table] = [...ids.values()];
+  }
+}
+
+export async function runSync(db: Database.Database, inputPeer: SyncPeer, transport: SyncTransport): Promise<SyncResult> {
+  assertIdle(db);
+  state.running.add(db.name);
+  const started = Date.now();
+  const startedAt = new Date(started).toISOString();
+  const logId = randomUUID();
+  const result: SyncResult = { received: 0, sent: 0, conflicts: 0, conflictDetails: [], clockSkewMs: 0, warnings: [], durationMs: 0 };
+  const addConflicts = (details: SyncConflict[]) => {
+    for (const detail of details) {
+      if (!result.conflictDetails.some((old) => old.table === detail.table && old.id === detail.id
+        && [old.localUpdatedAt, old.remoteUpdatedAt].sort().join() === [detail.localUpdatedAt, detail.remoteUpdatedAt].sort().join())) {
+        result.conflictDetails.push(detail);
+      }
+    }
+    result.conflicts = result.conflictDetails.length;
+  };
+  try {
+    // 呼出し元の古い一覧ではなく、直前までの同期位置を使う
+    const peer = db.prepare('SELECT * FROM sync_peers WHERE id = ?').get(inputPeer.id) as SyncPeer | undefined;
+    if (!peer) throw new SyncError('Link先が見つかりません。', 404);
+    db.prepare('INSERT INTO sync_log (id, peer_device_id, started_at, status) VALUES (?, ?, ?, ?)').run(logId, peer.device_id, startedAt, 'running');
+    await backupDatabase(db);
+    const pingStarted = Date.now();
+    const ping = await transport.ping();
+    if (ping.deviceId === getDeviceId(db)) throw new SyncError(duplicateDeviceMessage, 409);
+    if (ping.deviceId !== peer.device_id || !validTime(ping.serverTime)) throw new SyncError('相手PCの情報が一致しません。', 502);
+    result.clockSkewMs = Date.parse(ping.serverTime) - (pingStarted + Date.now()) / 2;
+    if (Math.abs(result.clockSkewMs) > 180_000) result.warnings.push('相手PCとの時刻差が3分を超えています。時計を確認してください。');
+    const incoming = await transport.changes(overlap(peer.last_pulled_until));
+    if (!validTime(incoming.serverTime)) throw new SyncError('相手PCの時刻が不正です。', 502);
+    const pulled = applyChanges(db, incoming.changes, { lastSyncedAt: peer.last_synced_at });
+    result.received = pulled.applied;
+    addConflicts(pulled.conflictDetails);
+    db.prepare('UPDATE sync_peers SET last_pulled_until = ?, updated_at = ? WHERE id = ?').run(incoming.serverTime, new Date().toISOString(), peer.id);
+    const pushedUntil = new Date().toISOString();
+    const outgoing = collectChanges(db, overlap(peer.last_pushed_until), peer.device_id);
+    mergeCanonical(outgoing, pulled.canonicalChanges);
+    const pushed = await transport.apply(outgoing, peer.last_synced_at);
+    result.sent = pushed.applied;
+    addConflicts(pushed.conflictDetails);
+    // 相手側で初めて判明したID統合も取り込む
+    const reconciled = applyChanges(db, pushed.canonicalChanges, { lastSyncedAt: peer.last_synced_at });
+    result.received += reconciled.applied;
+    addConflicts(reconciled.conflictDetails);
+    const finishedAt = new Date().toISOString();
+    db.prepare('UPDATE sync_peers SET last_pushed_until = ?, last_synced_at = ?, updated_at = ? WHERE id = ?').run(pushedUntil, finishedAt, finishedAt, peer.id);
+    purgeDeletedRows(db);
+    result.durationMs = Date.now() - started;
+    db.prepare(`UPDATE sync_log SET finished_at = ?, status = 'success', received = ?, sent = ?, conflicts = ?, detail = ? WHERE id = ?`)
+      .run(finishedAt, result.received, result.sent, result.conflicts, JSON.stringify(result), logId);
+    return result;
+  } catch (error) {
+    result.durationMs = Date.now() - started;
+    const reason = error instanceof Error ? error.message : '同期に失敗しました。';
+    db.prepare(`UPDATE sync_log SET finished_at = ?, status = 'failed', received = ?, sent = ?, conflicts = ?, detail = ? WHERE id = ?`)
+      .run(new Date().toISOString(), result.received, result.sent, result.conflicts, JSON.stringify({ ...result, error: reason }), logId);
+    throw error;
+  } finally {
+    state.running.delete(db.name);
+  }
+}

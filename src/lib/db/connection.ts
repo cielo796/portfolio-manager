@@ -13,6 +13,21 @@ type GlobalWithDb = typeof globalThis & {
 
 const globalWithDb = globalThis as GlobalWithDb;
 
+export function openDatabase(dbPath: string): Database.Database {
+  const resolvedPath = path.resolve(dbPath);
+  fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
+  const db = new Database(resolvedPath);
+  try {
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
+    runMigrations(db);
+    return db;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
 export function getDb(): Database.Database {
   if (!globalWithDb.__portfolioDb) {
     const configuredDbPath = process.env.SQLITE_DB_PATH?.trim();

@@ -12,3 +12,4 @@ export { exportBackupData, importBackupData, clearAllData } from './backup';
 export type { BackupData } from './backup';
 export { getDeviceId, getDeviceName } from './device';
 export { purgeDeletedRows } from './maintenance';
+export { getDb, openDatabase } from './connection';

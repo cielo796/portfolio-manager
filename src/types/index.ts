@@ -214,3 +214,59 @@ export interface ApiResponse<T> {
   error?: string;
   success: boolean;
 }
+
+// LAN同期ではDBの全列をそのまま交換する
+export type SyncTable = 'portfolios' | 'holdings' | 'transactions' | 'trade_ideas' | 'ticker_presets' | 'watchlist_items';
+export type SyncValue = string | number | null;
+export interface SyncRow {
+  [column: string]: SyncValue;
+  id: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+export type SyncChanges = Record<SyncTable, SyncRow[]>;
+export interface SyncConflict {
+  table: SyncTable;
+  id: string;
+  winner: 'local' | 'remote';
+  localUpdatedAt: string;
+  remoteUpdatedAt: string;
+}
+export interface SyncApplyResult {
+  applied: number;
+  skipped: number;
+  conflicts: number;
+  conflictDetails: SyncConflict[];
+  canonicalChanges: SyncChanges;
+}
+export interface SyncPeer {
+  id: string;
+  device_id: string;
+  name: string;
+  base_url: string;
+  secret: string;
+  last_synced_at: string | null;
+  last_pulled_until: string | null;
+  last_pushed_until: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface SyncPing {
+  deviceId: string;
+  deviceName: string;
+  serverTime: string;
+}
+export interface SyncTransport {
+  ping(): Promise<SyncPing>;
+  changes(since: string | null): Promise<{ changes: SyncChanges; serverTime: string }>;
+  apply(changes: SyncChanges, lastSyncedAt: string | null): Promise<SyncApplyResult>;
+}
+export interface SyncResult {
+  received: number;
+  sent: number;
+  conflicts: number;
+  conflictDetails: SyncConflict[];
+  clockSkewMs: number;
+  warnings: string[];
+  durationMs: number;
+}
