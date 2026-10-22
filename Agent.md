@@ -36,7 +36,7 @@
   - 売買履歴
 - `/news` ニュース
   - 保有銘柄ベースのフィルタ
-  - 「ニュース更新」ボタンで `/api/news?refresh=1` から取得（Alpha Vantage APIキー未設定/失敗時はモックへフォールバック）
+  - 「ニュース更新」ボタンで `/api/news?refresh=1` から取得（Yahoo Finance の検索APIと Google News RSS から取得、取得できないときはモックへフォールバック）
 - `/trade-ideas` トレードアイデア
   - 保有銘柄から選択
   - 自由入力メモ保存
@@ -71,8 +71,9 @@
 - `POST /api/trade-ideas`
   - アイデア作成
 - `GET /api/news`
-  - 保有銘柄ベースで Alpha Vantage `NEWS_SENTIMENT` を一括取得
-  - `ALPHA_VANTAGE_API_KEY` 未設定、またはプロバイダ応答が空/失敗の場合はモックニュースを返す
+  - 保有銘柄ベースで Yahoo Finance の検索APIと Google News RSS からニュースを取得
+  - 15分キャッシュし、`refresh=1` で明示的に再取得
+  - 取得できない場合はモックニュースを返す
 - `GET /api/backup`
   - バックアップJSON出力（portfolios/holdings/transactions/tradeIdeas）
 - `POST /api/backup`
@@ -97,11 +98,12 @@
   - JPYクォートはそのまま円、USDクォートは USDJPY で円換算
 - ニュース:
   - 初期表示はモックニュース
-  - 「ニュース更新」ボタン押下時に Alpha Vantage `NEWS_SENTIMENT` を保有銘柄まとめて1リクエストで取得
+  - 「ニュース更新」ボタン押下時に Yahoo Finance の検索APIと Google News RSS から保有銘柄のニュースを取得
   - `/api/news` の通常呼び出しは15分キャッシュ、UIの手動更新は `refresh=1` で明示的に再取得
+  - 取得できないときはモックニュースを表示
 
 ## 8) 既知の未実装/制限
-- ニュースAPIは Alpha Vantage 連携済み（日本株/FXニュースの網羅性はプロバイダ依存）
+- ニュースは Yahoo Finance の検索APIと Google News RSS から取得（日本株/FXニュースの網羅性はプロバイダ依存）
 - 「決済」は保有削除であり、売却履歴の自動生成は未実装
 - ウォッチリストは実装済み（`/watchlist`、追加/編集/削除、SQLite保存、バックアップ対象）
 - FX対応は現時点で JPY/USD クォート通貨ペアを前提
