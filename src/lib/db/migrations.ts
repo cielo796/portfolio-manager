@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type Database from 'better-sqlite3';
-import { normalizeSectorKey, resolveSectorForSymbol } from '@/lib/sectors';
+import { normalizeSectorKey, resolveHoldingSector, resolveSectorForSymbol } from '@/lib/sectors';
 
 const MIGRATIONS: Array<{
   version: number;
@@ -45,10 +45,9 @@ function normalizeHoldingSectors(db: Database.Database) {
   const update = db.prepare('UPDATE holdings SET sector = ? WHERE id = ?');
   for (const row of rows) {
     const legacySector = row.sector?.trim().toLowerCase();
-    const sector = row.symbol.toUpperCase().trim() === 'CASH' || row.market === 'FX' ||
-      legacySector === 'cash' || legacySector === 'fx'
-      ? null
-      : normalizeSectorKey(row.sector);
+    const sector = legacySector === 'cash' || legacySector === 'fx'
+      ? resolveHoldingSector(row.symbol, row.market, null)
+      : resolveHoldingSector(row.symbol, row.market, row.sector);
     if (sector !== row.sector) update.run(sector, row.id);
   }
 }
