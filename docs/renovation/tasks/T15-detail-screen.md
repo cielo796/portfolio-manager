@@ -10,7 +10,8 @@
 - `src/app/detail/page.tsx`（新規。`/detail?symbol=NVDA&market=US`）
 - `src/components/detail/**`（新規）
 - `src/components/shell/top-bar.tsx`、`src/components/shell/side-nav.tsx`（検索欄とナビ項目の追加）
-- `src/components/holdings/**`、`src/components/watchlist/**`、`src/components/home/**`（銘柄名から詳細画面へのリンクを足すだけ）
+- `src/components/holdings/**`、`src/components/watchlist/**`、`src/components/home/**`（銘柄名から詳細画面へのリンクを足すことと、下記「保有銘柄画面のクエリ対応」）
+- `src/app/portfolio/page.tsx`（下記「保有銘柄画面のクエリ対応」）
 - `src/lib/chart-data.ts`（指標計算の追加）
 - `src/types/index.ts`、`package.json`、`package-lock.json`
 - `docs/renovation/reports/T15.md`（新規）
@@ -27,6 +28,9 @@
 ## 銘柄検索（上部バー）
 - 上部バーに検索欄を追加（Ctrl+K でフォーカス）。保有・ウォッチリスト・ティッカー候補（`/api/tickers`）を対象に、コードと名称の部分一致で候補を最大10件表示。上下キーで選択、Enter で `/detail?symbol=…&market=…` へ。
 - 候補が無いとき、入力が米国株らしい英字なら「NVDA（米国）で開く」、4桁数字なら「7203（日本）で開く」を出す。
+
+## 保有銘柄画面のクエリ対応
+`/portfolio?symbol=<code>&market=<market>`（ホームの保有一覧からの遷移）で開いたとき、その銘柄を選択状態にして右ペインに表示する（`src/app/portfolio/page.tsx` と `src/components/holdings/holdings-workspace.tsx` の変更を許可。`useSearchParams` を使う場合は Next.js 16 の要件どおり `Suspense` で包む）。
 
 ## ナビ
 左ナビに「銘柄詳細」（`/detail`、クエリが無ければ保有の先頭銘柄）を「登録銘柄」の次に追加。保有銘柄・登録銘柄・ホームの銘柄名から詳細画面へリンクする。
