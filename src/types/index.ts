@@ -15,6 +15,8 @@ export interface Portfolio {
   description?: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+  updated_by?: string | null;
 }
 
 // 保有銘柄
@@ -31,6 +33,8 @@ export interface Holding {
   memo?: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+  updated_by?: string | null;
 }
 
 // 取引履歴
@@ -47,6 +51,9 @@ export interface Transaction {
   transaction_date: string;
   memo?: string;
   created_at: string;
+  deleted_at?: string | null;
+  updated_by?: string | null;
+  updated_at?: string;
 }
 
 // 株価情報
@@ -125,6 +132,8 @@ export interface WatchlistItem {
   memo?: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+  updated_by?: string | null;
 }
 
 // 事前登録ティッカー
@@ -135,6 +144,8 @@ export interface TickerPreset {
   name?: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+  updated_by?: string | null;
 }
 
 // トレードアイデア
@@ -145,6 +156,8 @@ export interface TradeIdea {
   note: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+  updated_by?: string | null;
 }
 
 // 保有銘柄 + 株価情報（表示用）

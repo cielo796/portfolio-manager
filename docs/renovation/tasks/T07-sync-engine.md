@@ -33,10 +33,14 @@ Next.js サーバーは今どおり `127.0.0.1` だけで待ち受ける。LAN�
 | `DELETE /api/sync/peers/[id]` | 自分の画面 | Link 解除（このPC側の登録を消す） |
 | `POST /api/sync/run` | 自分の画面 | `{ peerId }`。同期を1回実行し、結果（受信・送信・競合の件数、時刻差、所要時間）を返す。同時に2つ走らないよう排他する |
 | `GET /api/sync/log` | 自分の画面 | `sync_log` の直近50件 |
+| `POST /api/sync/device/regenerate` | 自分の画面 | このPCのデバイスIDを新しいUUIDに作り直す（DBファイルを別PCへコピーした場合の対処）。Link 済みの相手はすべて解除し、`last_*` もリセットする |
 | `POST /api/sync/peer/pair` | 相手PC | `{ code, deviceId, deviceName, port }`。コードが正しければ32バイトのシークレットを生成し、相手を `sync_peers` に登録（`base_url` は `http://<接続元IP>:<port>`。Next.js のルートでは接続元IPが取れないため、中継サーバーが付ける `X-Forwarded-For` の先頭の値を使い、ヘッダーがなければ `127.0.0.1` とする。Next.js は 127.0.0.1 でしか待ち受けないので、このヘッダーは中継サーバーからしか来ない）。`{ deviceId, deviceName, secret }` を返す |
 | `GET /api/sync/peer/ping` | 相手PC（署名必須） | `{ deviceId, deviceName, serverTime }` |
 | `GET /api/sync/peer/changes?since=` | 相手PC（署名必須） | 指定時刻以降の変更行（後述） |
 | `POST /api/sync/peer/apply` | 相手PC（署名必須） | 変更行を受け取り反映（後述） |
+
+### デバイスIDの重複
+デバイスIDは DB 内（`sync_meta`）にあるため、DBファイルをコピーして2台目を用意すると同じIDになる。`POST /api/sync/peers` と `POST /api/sync/peer/pair` の両方で、相手のIDが自分と同じなら 409 で拒否し、メッセージ「相手のPCと同じデバイスIDです。どちらかのPCの設定画面でデバイスIDを作り直してください」を返す。テストにもこのケースを入れる。
 
 ### 署名
 - ヘッダー：`X-PM-Device`（送信側のデバイスID）、`X-PM-Timestamp`（ISO時刻）、`X-PM-Signature`（hex）

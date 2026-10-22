@@ -1,6 +1,8 @@
 import 'server-only';
 
 import type Database from 'better-sqlite3';
+import { getDeviceId, getDeviceName } from './device';
+import { SYNC_TABLES } from './sync-tables';
 import { normalizeSectorKey, resolveHoldingSector, resolveSectorForSymbol } from '@/lib/sectors';
 
 const MIGRATIONS: Array<{
@@ -11,7 +13,37 @@ const MIGRATIONS: Array<{
 }> = [
   { version: 1, name: 'baseline-schema', disableForeignKeys: true, up: createBaselineSchema },
   { version: 2, name: 'normalize-holding-sectors', up: normalizeHoldingSectors },
+  { version: 3, name: 'sync-schema', up: createSyncSchema },
 ];
+
+function createSyncSchema(db: Database.Database) {
+  db.exec(`
+    ALTER TABLE transactions ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+    UPDATE transactions SET updated_at = created_at;
+    CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE sync_peers (
+      id TEXT PRIMARY KEY, device_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+      base_url TEXT NOT NULL, secret TEXT NOT NULL, last_synced_at TEXT,
+      last_pulled_until TEXT, last_pushed_until TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE sync_log (
+      id TEXT PRIMARY KEY, peer_device_id TEXT NOT NULL, started_at TEXT NOT NULL,
+      finished_at TEXT, status TEXT NOT NULL CHECK (status IN ('running', 'success', 'failed')),
+      received INTEGER NOT NULL DEFAULT 0, sent INTEGER NOT NULL DEFAULT 0,
+      conflicts INTEGER NOT NULL DEFAULT 0, detail TEXT
+    );
+  `);
+  for (const table of SYNC_TABLES) {
+    db.exec(`
+      ALTER TABLE ${table} ADD COLUMN deleted_at TEXT;
+      ALTER TABLE ${table} ADD COLUMN updated_by TEXT;
+      CREATE INDEX idx_${table}_updated_at ON ${table}(updated_at);
+    `);
+  }
+  getDeviceId(db);
+  getDeviceName(db);
+}
 
 export function runMigrations(db: Database.Database) {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;

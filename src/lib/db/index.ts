@@ -10,3 +10,5 @@ export { listStockPrices, upsertStockPrices } from './prices';
 export { listNewsItems, upsertNewsItems } from './news';
 export { exportBackupData, importBackupData, clearAllData } from './backup';
 export type { BackupData } from './backup';
+export { getDeviceId, getDeviceName } from './device';
+export { purgeDeletedRows } from './maintenance';

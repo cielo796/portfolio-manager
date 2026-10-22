@@ -4,6 +4,8 @@ import { Holding, Portfolio, TickerPreset, TradeIdea, Transaction, WatchlistItem
 import { mockPortfolios } from '@/lib/mock-data';
 import { normalizeSectorKey, resolveHoldingSector, resolveSectorForSymbol } from '@/lib/sectors';
 import { getDb } from './connection';
+import { getDeviceId } from './device';
+import { SYNC_TABLES } from './sync-tables';
 import { isValidMarket, isValidWatchlistKey } from './validators';
 import { listPortfolios } from './portfolios';
 import { listHoldings } from './holdings';
@@ -69,14 +71,21 @@ export interface BackupData {
   tickerPresets: TickerPresetBackup[];
 }
 
+function backupRow<T extends { deleted_at?: string | null; updated_by?: string | null }>(row: T) {
+  const copy = { ...row };
+  delete copy.deleted_at;
+  delete copy.updated_by;
+  return copy;
+}
+
 export function exportBackupData(): BackupData {
   return {
-    portfolios: listPortfolios(),
-    holdings: listHoldings(),
-    transactions: listTransactions(),
-    tradeIdeas: listTradeIdeas(),
-    watchlistItems: listWatchlistItems(),
-    tickerPresets: listTickerPresets(),
+    portfolios: listPortfolios().map(backupRow),
+    holdings: listHoldings().map(backupRow),
+    transactions: listTransactions().map(backupRow),
+    tradeIdeas: listTradeIdeas().map(backupRow),
+    watchlistItems: listWatchlistItems().map(backupRow),
+    tickerPresets: listTickerPresets().map(backupRow),
   };
 }
 
@@ -248,95 +257,86 @@ export function importBackupData(data: Partial<BackupData>) {
     return Array.from(uniqueBySymbolAndMarket.values());
   })();
 
-  const insertPortfolio = db.prepare(`
-    INSERT INTO portfolios (id, name, broker, description, created_at, updated_at)
-    VALUES (@id, @name, @broker, @description, @created_at, @updated_at)
-  `);
-  const insertHolding = db.prepare(`
-    INSERT INTO holdings (id, portfolio_id, symbol, name, market, shares, avg_cost, sort_order, sector, memo, created_at, updated_at)
-    VALUES (@id, @portfolio_id, @symbol, @name, @market, @shares, @avg_cost, @sort_order, @sector, @memo, @created_at, @updated_at)
-  `);
-  const insertTransaction = db.prepare(`
-    INSERT INTO transactions (id, portfolio_id, symbol, market, type, shares, price, total_amount, fees, transaction_date, memo, created_at)
-    VALUES (@id, @portfolio_id, @symbol, @market, @type, @shares, @price, @total_amount, @fees, @transaction_date, @memo, @created_at)
-  `);
-  const insertTradeIdea = db.prepare(`
-    INSERT INTO trade_ideas (id, symbol, market, note, created_at, updated_at)
-    VALUES (@id, @symbol, @market, @note, @created_at, @updated_at)
-  `);
-  const insertWatchlistItem = db.prepare(`
-    INSERT INTO watchlist_items (id, symbol, name, market, list_key, sort_order, sector, target_price, memo, created_at, updated_at)
-    VALUES (@id, @symbol, @name, @market, @list_key, @sort_order, @sector, @target_price, @memo, @created_at, @updated_at)
-  `);
-  const insertTickerPreset = db.prepare(`
-    INSERT INTO ticker_presets (id, symbol, market, name, created_at, updated_at)
-    VALUES (@id, @symbol, @market, @name, @created_at, @updated_at)
-  `);
+  // 取込前にID重複を検出し、従来どおり全体を失敗させる
+  const groups = [portfolios, holdings, transactions, tradeIdeas, watchlistItems, tickerPresets];
+  for (const rows of groups) {
+    if (new Set(rows.map((row) => row.id)).size !== rows.length) {
+      throw new Error('バックアップ内のIDが重複しています');
+    }
+  }
 
   const tx = db.transaction(() => {
-    db.prepare('DELETE FROM news_items').run();
-    db.prepare('DELETE FROM stock_prices').run();
-    db.prepare('DELETE FROM watchlist_items').run();
-    db.prepare('DELETE FROM ticker_presets').run();
-    db.prepare('DELETE FROM trade_ideas').run();
-    db.prepare('DELETE FROM transactions').run();
-    db.prepare('DELETE FROM holdings').run();
-    db.prepare('DELETE FROM portfolios').run();
-
-    if (portfolios.length === 0) {
-      for (const portfolio of mockPortfolios) {
-        insertPortfolio.run({
-          ...portfolio,
-          broker: portfolio.broker ?? '',
-          description: portfolio.description ?? null,
-        });
+    const now = new Date().toISOString();
+    const updatedBy = getDeviceId();
+    markAllDeleted(now, updatedBy);
+    const portfolioRows = portfolios.length ? portfolios : mockPortfolios.map((portfolio) => ({
+      ...portfolio,
+      broker: portfolio.broker ?? '',
+      description: portfolio.description ?? null,
+    }));
+    const entries = [
+      ['portfolios', portfolioRows],
+      ['holdings', holdings],
+      ['transactions', transactions],
+      ['trade_ideas', tradeIdeas],
+      ['watchlist_items', watchlistItems],
+      ['ticker_presets', tickerPresets],
+    ] as const;
+    for (const [table, rows] of entries) {
+      for (const row of rows) {
+        const restored = {
+          ...row, updated_at: now, updated_by: updatedBy, deleted_at: null,
+        };
+        // 銘柄の一意制約があるテーブルは、既存のIDを維持して復活させる
+        if (table === 'watchlist_items' || table === 'ticker_presets') {
+          const symbolRow = row as WatchlistItemBackup | TickerPresetBackup;
+          const existing = db.prepare(`SELECT id FROM ${table} WHERE symbol = ? AND market = ?`)
+            .get(symbolRow.symbol, symbolRow.market) as { id: string } | undefined;
+          if (existing) restored.id = existing.id;
+        }
+        const columns = Object.keys(restored);
+        db.prepare(`
+          INSERT INTO ${table} (${columns.join(', ')})
+          VALUES (${columns.map((column) => `@${column}`).join(', ')})
+          ON CONFLICT(id) DO UPDATE SET
+            ${columns.filter((column) => column !== 'id').map((column) => `${column} = excluded.${column}`).join(', ')}
+        `).run(restored);
       }
     }
-
-    for (const portfolio of portfolios) {
-      insertPortfolio.run(portfolio);
-    }
-    for (const holding of holdings) {
-      insertHolding.run(holding);
-    }
-    for (const transaction of transactions) {
-      insertTransaction.run(transaction);
-    }
-    for (const idea of tradeIdeas) {
-      insertTradeIdea.run(idea);
-    }
-    for (const item of watchlistItems) {
-      insertWatchlistItem.run(item);
-    }
-    for (const preset of tickerPresets) {
-      insertTickerPreset.run(preset);
-    }
   });
-
   tx();
+}
+
+function markAllDeleted(now: string, updatedBy: string) {
+  const db = getDb();
+  db.prepare('DELETE FROM news_items').run();
+  db.prepare('DELETE FROM stock_prices').run();
+  for (const table of SYNC_TABLES) {
+    db.prepare(`
+      UPDATE ${table} SET deleted_at = ?, updated_at = ?, updated_by = ?
+      WHERE deleted_at IS NULL
+    `).run(now, now, updatedBy);
+  }
 }
 
 export function clearAllData() {
   const db = getDb();
-  const tx = db.transaction(() => {
-    db.prepare('DELETE FROM news_items').run();
-    db.prepare('DELETE FROM stock_prices').run();
-    db.prepare('DELETE FROM watchlist_items').run();
-    db.prepare('DELETE FROM ticker_presets').run();
-    db.prepare('DELETE FROM trade_ideas').run();
-    db.prepare('DELETE FROM transactions').run();
-    db.prepare('DELETE FROM holdings').run();
-    db.prepare('DELETE FROM portfolios').run();
+  db.transaction(() => {
+    const now = new Date().toISOString();
+    const updatedBy = getDeviceId();
+    markAllDeleted(now, updatedBy);
+    const insert = db.prepare(`
+      INSERT INTO portfolios (id, name, broker, description, created_at, updated_at, updated_by)
+      VALUES (@id, @name, @broker, @description, @created_at, @updated_at, @updated_by)
+      ON CONFLICT(id) DO UPDATE SET name = excluded.name, broker = excluded.broker,
+        description = excluded.description, created_at = excluded.created_at,
+        updated_at = excluded.updated_at, updated_by = excluded.updated_by, deleted_at = NULL
+    `);
     for (const portfolio of mockPortfolios) {
-      db.prepare(`
-        INSERT INTO portfolios (id, name, broker, description, created_at, updated_at)
-        VALUES (@id, @name, @broker, @description, @created_at, @updated_at)
-      `).run({
-        ...portfolio,
-        broker: portfolio.broker ?? '',
-        description: portfolio.description ?? null,
+      insert.run({
+        ...portfolio, broker: portfolio.broker ?? '', description: portfolio.description ?? null,
+        updated_at: now, updated_by: updatedBy,
       });
     }
-  });
-  tx();
+  })();
 }

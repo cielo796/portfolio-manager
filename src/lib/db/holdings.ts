@@ -3,10 +3,11 @@ import 'server-only';
 import { Holding } from '@/types';
 import { resolveHoldingSector } from '@/lib/sectors';
 import { getDb } from './connection';
+import { getDeviceId } from './device';
 
 export function listHoldings(): Holding[] {
   const db = getDb();
-  return db.prepare('SELECT * FROM holdings ORDER BY sort_order ASC, created_at ASC').all() as Holding[];
+  return db.prepare('SELECT * FROM holdings WHERE deleted_at IS NULL ORDER BY sort_order ASC, created_at ASC').all() as Holding[];
 }
 
 type NewHoldingInput = Omit<Holding, 'id' | 'created_at' | 'updated_at' | 'name' | 'sort_order'> & {
@@ -17,7 +18,7 @@ export function createHolding(input: NewHoldingInput): Holding {
   const db = getDb();
   const now = new Date().toISOString();
   const maxSortOrder = db
-    .prepare('SELECT MAX(sort_order) as maxSortOrder FROM holdings')
+    .prepare('SELECT MAX(sort_order) as maxSortOrder FROM holdings WHERE deleted_at IS NULL')
     .get() as { maxSortOrder: number | null };
   const holding: Holding = {
     id: crypto.randomUUID(),
@@ -32,11 +33,12 @@ export function createHolding(input: NewHoldingInput): Holding {
     memo: input.memo?.trim() || undefined,
     created_at: now,
     updated_at: now,
+    updated_by: getDeviceId(),
   };
 
   db.prepare(`
-    INSERT INTO holdings (id, portfolio_id, symbol, name, market, shares, avg_cost, sort_order, sector, memo, created_at, updated_at)
-    VALUES (@id, @portfolio_id, @symbol, @name, @market, @shares, @avg_cost, @sort_order, @sector, @memo, @created_at, @updated_at)
+    INSERT INTO holdings (id, portfolio_id, symbol, name, market, shares, avg_cost, sort_order, sector, memo, created_at, updated_at, updated_by)
+    VALUES (@id, @portfolio_id, @symbol, @name, @market, @shares, @avg_cost, @sort_order, @sector, @memo, @created_at, @updated_at, @updated_by)
   `).run({
     ...holding,
     name: holding.name ?? null,
@@ -51,7 +53,7 @@ type UpdateHoldingInput = Partial<Pick<Holding, 'name' | 'shares' | 'avg_cost' |
 
 export function updateHoldingById(id: string, updates: UpdateHoldingInput): Holding | null {
   const db = getDb();
-  const current = db.prepare('SELECT * FROM holdings WHERE id = ?').get(id) as Holding | undefined;
+  const current = db.prepare('SELECT * FROM holdings WHERE id = ? AND deleted_at IS NULL').get(id) as Holding | undefined;
   if (!current) return null;
 
   const now = new Date().toISOString();
@@ -68,6 +70,7 @@ export function updateHoldingById(id: string, updates: UpdateHoldingInput): Hold
     ) ?? undefined,
     memo: updates.memo !== undefined ? updates.memo : current.memo,
     updated_at: now,
+    updated_by: getDeviceId(),
   };
 
   db.prepare(`
@@ -78,8 +81,9 @@ export function updateHoldingById(id: string, updates: UpdateHoldingInput): Hold
       avg_cost = @avg_cost,
       sector = @sector,
       memo = @memo,
-      updated_at = @updated_at
-    WHERE id = @id
+      updated_at = @updated_at,
+      updated_by = @updated_by
+    WHERE id = @id AND deleted_at IS NULL
   `).run({
     id: next.id,
     name: next.name ?? null,
@@ -88,6 +92,7 @@ export function updateHoldingById(id: string, updates: UpdateHoldingInput): Hold
     sector: next.sector ?? null,
     memo: next.memo ?? null,
     updated_at: next.updated_at,
+    updated_by: next.updated_by,
   });
 
   return next;
@@ -95,7 +100,11 @@ export function updateHoldingById(id: string, updates: UpdateHoldingInput): Hold
 
 export function deleteHoldingById(id: string): boolean {
   const db = getDb();
-  const result = db.prepare('DELETE FROM holdings WHERE id = ?').run(id);
+  const now = new Date().toISOString();
+  const result = db.prepare(`
+    UPDATE holdings SET deleted_at = ?, updated_at = ?, updated_by = ?
+    WHERE id = ? AND deleted_at IS NULL
+  `).run(now, now, getDeviceId(), id);
   return result.changes > 0;
 }
 
@@ -109,8 +118,9 @@ export function updateHoldingsOrder(updates: HoldingOrderUpdate[]): Holding[] {
   const update = db.prepare(`
     UPDATE holdings
     SET sort_order = @sort_order,
-        updated_at = @updated_at
-    WHERE id = @id
+        updated_at = @updated_at,
+        updated_by = @updated_by
+    WHERE id = @id AND deleted_at IS NULL
   `);
   const now = new Date().toISOString();
 
@@ -123,6 +133,7 @@ export function updateHoldingsOrder(updates: HoldingOrderUpdate[]): Holding[] {
         id: item.id,
         sort_order: item.sort_order,
         updated_at: now,
+        updated_by: getDeviceId(),
       });
     }
   });

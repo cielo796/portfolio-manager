@@ -27,6 +27,7 @@ const fixture: BackupData = {
     created_at: timestamp, updated_at: timestamp,
   }],
 };
+const content = (data: unknown) => JSON.parse(JSON.stringify(data, (key, value) => key === 'updated_at' ? undefined : value));
 const counts = (data: BackupData) => Object.fromEntries(
   Object.entries(data).map(([key, rows]) => [key, rows.length])
 );
@@ -73,7 +74,7 @@ describe('一時DBでのバックアップと価格マップ', () => {
     dbApi.importBackupData(JSON.parse(JSON.stringify(exported)));
     const restored = dbApi.exportBackupData();
     expect(counts(restored)).toEqual(counts(exported));
-    expect(restored).toEqual(exported);
+    expect(content(restored)).toEqual(content(exported));
   });
 
   it('口座が空でもウォッチリスト・候補・アイデアを取り込み、保有・取引は取り込まない', () => {
@@ -82,9 +83,9 @@ describe('一時DBでのバックアップと価格マップ', () => {
     expect(restored.portfolios.map((item) => item.id)).toEqual(mockPortfolios.map((item) => item.id));
     expect(restored.holdings).toEqual([]);
     expect(restored.transactions).toEqual([]);
-    expect(restored.watchlistItems).toEqual(fixture.watchlistItems);
-    expect(restored.tickerPresets).toEqual(fixture.tickerPresets);
-    expect(restored.tradeIdeas).toEqual(fixture.tradeIdeas);
+    expect(content(restored.watchlistItems)).toEqual(content(fixture.watchlistItems));
+    expect(content(restored.tickerPresets)).toEqual(content(fixture.tickerPresets));
+    expect(content(restored.tradeIdeas)).toEqual(content(fixture.tradeIdeas));
   });
 
   it('口座省略時も独立データを取り込む', () => {

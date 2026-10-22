@@ -2,6 +2,7 @@ import 'server-only';
 
 import { Holding, Transaction, TransactionType } from '@/types';
 import { getDb } from './connection';
+import { getDeviceId } from './device';
 
 export function listTransactions(): Transaction[] {
   const db = getDb();
@@ -9,6 +10,7 @@ export function listTransactions(): Transaction[] {
     .prepare(`
       SELECT *
       FROM transactions
+      WHERE deleted_at IS NULL
       ORDER BY transaction_date DESC, created_at DESC
     `)
     .all() as Transaction[];
@@ -43,11 +45,13 @@ export function createTransaction(input: NewTransactionInput): Transaction {
     transaction_date: input.transaction_date,
     memo: input.memo?.trim() || undefined,
     created_at: now,
+    updated_at: now,
+    updated_by: getDeviceId(),
   };
 
   db.prepare(`
-    INSERT INTO transactions (id, portfolio_id, symbol, market, type, shares, price, total_amount, fees, transaction_date, memo, created_at)
-    VALUES (@id, @portfolio_id, @symbol, @market, @type, @shares, @price, @total_amount, @fees, @transaction_date, @memo, @created_at)
+    INSERT INTO transactions (id, portfolio_id, symbol, market, type, shares, price, total_amount, fees, transaction_date, memo, created_at, updated_at, updated_by)
+    VALUES (@id, @portfolio_id, @symbol, @market, @type, @shares, @price, @total_amount, @fees, @transaction_date, @memo, @created_at, @updated_at, @updated_by)
   `).run({
     ...transaction,
     memo: transaction.memo ?? null,
