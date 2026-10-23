@@ -409,7 +409,7 @@ export interface ShellSyncLog {
 }
 
 // LAN同期ではDBの全列をそのまま交換する
-export type SyncTable = 'portfolios' | 'holdings' | 'transactions' | 'trade_ideas' | 'ticker_presets' | 'watchlist_items' | 'stock_memos' | 'memo_symbols' | 'top_picks';
+export type SyncTable = 'portfolios' | 'holdings' | 'transactions' | 'trade_ideas' | 'ticker_presets' | 'watchlist_items' | 'stock_memos' | 'memo_symbols' | 'top_picks' | 'portfolio_snapshots';
 export type SyncValue = string | number | null;
 export interface SyncRow {
   [column: string]: SyncValue;
@@ -463,4 +463,27 @@ export interface SyncResult {
   clockSkewMs: number;
   warnings: string[];
   durationMs: number;
+}
+
+export interface PortfolioSnapshot {
+  id: string;
+  snapshot_date: string;
+  portfolio_id: string | null;
+  market_value_jpy: number;
+  cost_basis_jpy: number;
+  cash_jpy: number | null;
+  usd_jpy: number | null;
+  is_estimate: 0 | 1;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  updated_by: string | null;
+}
+export type SnapshotInput = Omit<PortfolioSnapshot, 'id' | 'created_at' | 'updated_at' | 'deleted_at' | 'updated_by'>;
+export interface HistoryPoint { date: string; value: number }
+export interface HistoryBenchmarks {
+  sp500: HistoryPoint[];
+  nikkei: HistoryPoint[];
+  usdJpy: HistoryPoint[];
+  warnings: string[];
 }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { Market, StockPrice } from '@/types';
 import { getMarketCurrency } from '@/lib/utils';
 import { priceKey } from '@/lib/price-key';
-import { listStockPrices, upsertStockPrices } from '@/lib/db';
+import { listStockPrices, upsertStockPrices, recordCurrentSnapshots } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -125,6 +125,7 @@ export async function POST(request: Request) {
 
   const requestedSymbols = body.symbols ?? [];
   if (!Array.isArray(requestedSymbols) || requestedSymbols.length === 0) {
+    recordCurrentSnapshots();
     return NextResponse.json({ prices: {} as Record<string, StockPrice> });
   }
 
@@ -176,6 +177,7 @@ export async function POST(request: Request) {
 
   const prices = Object.fromEntries(priceEntries.filter((entry): entry is readonly [string, StockPrice] => entry !== null));
   upsertStockPrices(Object.values(prices));
+  recordCurrentSnapshots();
 
   return NextResponse.json({
     prices,

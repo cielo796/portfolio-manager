@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { Holding, MemoSymbolRow, Portfolio, StockMemo, TickerPreset, TopPick, TradeIdea, Transaction, WatchlistItem, WatchlistKey } from '@/types';
+import { Holding, MemoSymbolRow, Portfolio, PortfolioSnapshot, StockMemo, TickerPreset, TopPick, TradeIdea, Transaction, WatchlistItem, WatchlistKey } from '@/types';
 import { mockPortfolios } from '@/lib/mock-data';
 import { normalizeSectorKey, resolveHoldingSector, resolveSectorForSymbol } from '@/lib/sectors';
 import { getDb } from './connection';
@@ -14,6 +14,7 @@ import { listTradeIdeas } from './trade-ideas';
 import { listWatchlistItems } from './watchlist';
 import { listTickerPresets } from './ticker-presets';
 import { validateTopPickInput } from './top-picks';
+import { snapshotId, validSnapshot } from '@/components/history/model';
 
 type PortfolioBackup = Pick<Portfolio, 'id' | 'name' | 'broker' | 'description' | 'created_at' | 'updated_at'>;
 type HoldingBackup = Pick<
@@ -83,6 +84,7 @@ export interface MemoBackupData extends BackupData {
   stockMemos?: MemoBackup[];
   memoSymbols?: SymbolBackup[];
   topPicks?: Omit<TopPick, 'deleted_at' | 'updated_by'>[];
+  portfolioSnapshots?: Omit<PortfolioSnapshot, 'deleted_at' | 'updated_by'>[];
 }
 
 function backupRow<T extends { deleted_at?: string | null; updated_by?: string | null }>(row: T) {
@@ -94,6 +96,7 @@ function backupRow<T extends { deleted_at?: string | null; updated_by?: string |
 
 export function exportBackupData(): MemoBackupData {
   const db = getDb();
+  const snapshots = db.prepare('SELECT * FROM portfolio_snapshots WHERE deleted_at IS NULL ORDER BY snapshot_date, id').all() as PortfolioSnapshot[];
   const topPicks = db.prepare('SELECT * FROM top_picks WHERE deleted_at IS NULL ORDER BY rank, updated_at, id').all() as TopPick[];
   const stockMemos = db.prepare('SELECT * FROM stock_memos WHERE deleted_at IS NULL ORDER BY created_at, id').all() as Array<MemoBackup & { deleted_at?: string | null; updated_by?: string | null }>;
   const memoSymbols = db.prepare(`SELECT s.* FROM memo_symbols s JOIN stock_memos m ON m.id = s.memo_id
@@ -112,6 +115,7 @@ export function exportBackupData(): MemoBackupData {
     tickerPresets: listTickerPresets().map(backupRow),
     ...(stockMemos.length ? { stockMemos: stockMemos.map(backupRow), memoSymbols: memoSymbols.map(backupRow) } : {}),
     ...(topPicks.length ? { topPicks: topPicks.map(backupRow) } : {}),
+    ...(snapshots.length ? { portfolioSnapshots: snapshots.map(backupRow) } : {}),
   };
 }
 
@@ -350,8 +354,16 @@ export function importBackupData(data: Partial<MemoBackupData>) {
   });
   if (topPicks.filter((pick) => pick.removed_at === null).length > 10) throw new Error('現在のピックは最大10件です');
 
+  const snapshots = (data.portfolioSnapshots ?? []).map((item) => {
+    if (!item || !validSnapshot(item) || item.id !== snapshotId(item.snapshot_date, item.portfolio_id)
+      || !Number.isFinite(Date.parse(item.created_at))) throw new Error('資産記録のバックアップが不正です。');
+    return { id: item.id, snapshot_date: item.snapshot_date, portfolio_id: item.portfolio_id,
+      market_value_jpy: item.market_value_jpy, cost_basis_jpy: item.cost_basis_jpy,
+      cash_jpy: item.cash_jpy, usd_jpy: item.usd_jpy, is_estimate: item.is_estimate, created_at: item.created_at };
+  });
+
   // 取込前にID重複を検出し、従来どおり全体を失敗させる
-  const groups = [portfolios, holdings, transactions, tradeIdeas, watchlistItems, tickerPresets, stockMemos, memoSymbols, topPicks];
+  const groups = [portfolios, holdings, transactions, tradeIdeas, watchlistItems, tickerPresets, stockMemos, memoSymbols, topPicks, snapshots];
   for (const rows of groups) {
     if (new Set(rows.map((row) => row.id)).size !== rows.length) {
       throw new Error('バックアップ内のIDが重複しています');
@@ -377,6 +389,7 @@ export function importBackupData(data: Partial<MemoBackupData>) {
       ['stock_memos', stockMemos],
       ['memo_symbols', memoSymbols],
       ['top_picks', topPicks],
+      ['portfolio_snapshots', snapshots],
     ] as const;
     for (const [table, rows] of entries) {
       for (const row of rows) {

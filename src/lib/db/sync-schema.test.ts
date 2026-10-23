@@ -84,6 +84,8 @@ describe('同期スキーマと論理削除', () => {
         ALTER TABLE transactions DROP COLUMN holding_id;
         ALTER TABLE holdings DROP COLUMN ledger_opening_shares;
         ALTER TABLE holdings DROP COLUMN ledger_opening_cost;
+        DROP TABLE IF EXISTS portfolio_snapshots;
+        DROP TABLE IF EXISTS top_picks;
         DROP TABLE IF EXISTS memo_symbols;
         DROP TABLE IF EXISTS stock_memos;
       `);
