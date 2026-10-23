@@ -2,6 +2,7 @@
 
 import type { Holding, Transaction } from '@/types';
 import { replayTrades, TradeLedgerError } from '@/lib/trade-ledger';
+import { normalizeSectorKey, resolveHoldingSector } from '@/lib/sectors';
 import { getDb } from './connection';
 import { getDeviceId } from './device';
 import { createHolding } from './holdings';
@@ -22,12 +23,17 @@ function findSymbolProfile(symbol: string, market: string): { name: string | nul
   const watch = db.prepare(`SELECT name, sector FROM watchlist_items WHERE symbol = ? AND market = ? AND deleted_at IS NULL
     ORDER BY (NULLIF(TRIM(name), '') IS NULL) ASC, created_at DESC LIMIT 1`).get(symbol, market) as
     { name: string | null; sector: string | null } | undefined;
-  const holding = db.prepare(`SELECT name, sector FROM holdings WHERE symbol = ? AND market = ? AND deleted_at IS NULL
+  const holding = db.prepare(`SELECT name FROM holdings WHERE symbol = ? AND market = ? AND deleted_at IS NULL
     ORDER BY (NULLIF(TRIM(name), '') IS NULL) ASC, created_at DESC LIMIT 1`).get(symbol, market) as
-    { name: string | null; sector: string | null } | undefined;
+    { name: string | null } | undefined;
+  // 別口座の保有からは、未分類（'other'）と空を除いたセクターだけを引き継ぐ。
+  const inherited = (db.prepare(`SELECT sector FROM holdings WHERE symbol = ? AND market = ? AND deleted_at IS NULL
+    AND NULLIF(TRIM(sector), '') IS NOT NULL ORDER BY created_at DESC`).all(symbol, market) as { sector: string }[])
+    .map((row) => row.sector.trim())
+    .find((sector) => normalizeSectorKey(sector) !== 'other');
   return {
     name: watch?.name?.trim() || holding?.name?.trim() || null,
-    sector: watch?.sector?.trim() || null,
+    sector: watch?.sector?.trim() || inherited || resolveHoldingSector(symbol, market, undefined),
   };
 }
 

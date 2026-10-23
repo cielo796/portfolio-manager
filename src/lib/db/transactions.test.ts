@@ -81,6 +81,15 @@ describe('一時DBでの記録と保有の連動', () => {
     api.createTransaction({ ...purchase, name: '別の銘柄名' });
     expect(api.listHoldings().find((holding) => holding.portfolio_id === 'account')).toMatchObject({ name: '登録銘柄名', sector: 'technology' });
   });
+  it('別口座の保有の sector を引き継ぐ', () => {
+    api.createHolding({ portfolio_id: 'other', symbol: 'TEST', market: 'US', shares: 5, avg_cost: 100, sector: 'healthcare' });
+    api.createTransaction(purchase);
+    expect(api.listHoldings().find((holding) => holding.portfolio_id === 'account')).toMatchObject({ sector: 'healthcare' });
+  });
+  it('どこにも無ければ resolveHoldingSector の結果になる', () => {
+    api.createTransaction({ ...purchase, symbol: 'AAPL' });
+    expect(api.listHoldings()[0]).toMatchObject({ symbol: 'AAPL', sector: 'technology' });
+  });
   it('超過売却、過去日への編集、購入削除を原子的に拒否する', () => {
     const buy = api.createTransaction(purchase);
     const sell = api.createTransaction({ ...purchase, type: 'sell', shares: 5, transaction_date: '2026-02-01' });
