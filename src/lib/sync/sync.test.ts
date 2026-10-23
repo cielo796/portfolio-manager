@@ -170,6 +170,48 @@ describe('LAN同期エンジン・API', () => {
     expect(sync.collectChanges(a, null)).toEqual(sync.collectChanges(b, null));
   });
 
+  it('メモと複数の紐づけが2台間で同期され、編集と論理削除も伝わる', async () => {
+    put(a, 'stock_memos', { id: 'memo', title: 'GPU比較', body: '初回', tag: 'idea', price_snapshot: '{"NVDA|US":{"price":142.5,"currency":"USD","at":"2026-10-22T00:00:00.000Z"}}' });
+    put(a, 'memo_symbols', { id: 'nvda', memo_id: 'memo', symbol: 'NVDA', market: 'US' });
+    put(a, 'memo_symbols', { id: 'amd', memo_id: 'memo', symbol: 'AMD', market: 'US' });
+    await engine.runSync(a, peer, direct());
+    expect(sync.collectChanges(a, null)).toEqual(sync.collectChanges(b, null));
+    vi.setSystemTime('2026-10-22T00:04:00.000Z');
+    b.prepare('UPDATE stock_memos SET body = ?, updated_at = ?, updated_by = ? WHERE id = ?').run('Bから更新', new Date().toISOString(), identity(b), 'memo');
+    await engine.runSync(a, peer, direct());
+    expect(row(a, 'stock_memos', 'memo')?.body).toBe('Bから更新');
+    expect(row(a, 'stock_memos', 'memo')?.price_snapshot).toContain('142.5');
+    vi.setSystemTime('2026-10-22T00:05:00.000Z');
+    for (const table of ['stock_memos', 'memo_symbols']) a.prepare(`UPDATE ${table} SET deleted_at = ?, updated_at = ?, updated_by = ?`).run(new Date().toISOString(), new Date().toISOString(), identity(a));
+    await engine.runSync(a, peer, direct());
+    expect(b.prepare('SELECT * FROM stock_memos WHERE deleted_at IS NULL').all()).toEqual([]);
+    expect(b.prepare('SELECT * FROM memo_symbols WHERE deleted_at IS NULL').all()).toEqual([]);
+  });
+
+  it.each([false, true])('同一メモの同一銘柄は小さいIDの1行に収束する（小さいID側が新しい=%s）', async (smallNewer) => {
+    put(a, 'stock_memos', { id: 'memo', title: 'メモ', body: '' });
+    sync.applyChanges(b, sync.collectChanges(a, null), { lastSyncedAt: null });
+    put(a, 'memo_symbols', { id: 'a-link', memo_id: 'memo', symbol: 'NVDA', market: 'US', updated_at: smallNewer ? latest : initial });
+    put(b, 'memo_symbols', { id: 'z-link', memo_id: 'memo', symbol: 'NVDA', market: 'US', updated_at: smallNewer ? initial : latest });
+    put(b, 'stock_memos', { id: 'other-memo', title: '別メモ', body: '' });
+    put(b, 'memo_symbols', { id: 'other-link', memo_id: 'other-memo', symbol: 'NVDA', market: 'US' });
+    await engine.runSync(a, peer, direct());
+    expect(sync.collectChanges(a, null)).toEqual(sync.collectChanges(b, null));
+    expect(a.prepare("SELECT id, updated_at FROM memo_symbols WHERE memo_id = 'memo'").all()).toEqual([{ id: 'a-link', updated_at: latest }]);
+    expect(a.prepare('SELECT * FROM memo_symbols').all()).toHaveLength(2);
+    expect(await engine.runSync(a, peer, direct())).toMatchObject({ received: 0, sent: 0 });
+  });
+
+  it('紐づけは親より先に到着でき、親が後で届いても保持される', () => {
+    put(a, 'memo_symbols', { id: 'link', memo_id: 'late-parent', symbol: 'NVDA', market: 'US' });
+    sync.applyChanges(b, sync.collectChanges(a, null), { lastSyncedAt: null });
+    expect(row(b, 'memo_symbols', 'link')).toBeDefined();
+    put(a, 'stock_memos', { id: 'late-parent', title: '遅れた親', body: '' });
+    sync.applyChanges(b, sync.collectChanges(a, null), { lastSyncedAt: null });
+    expect(row(b, 'stock_memos', 'late-parent')?.title).toBe('遅れた親');
+    expect(b.pragma('foreign_key_check')).toEqual([]);
+  });
+
   it('sinceは厳密な後方比較、更新元の除外はNULLを保持する', () => {
     idea(a);
     expect(sync.collectChanges(a, initial).trade_ideas).toHaveLength(0);

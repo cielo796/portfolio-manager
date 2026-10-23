@@ -1,5 +1,7 @@
 'use client';
 
+import { LatestMemos } from '@/components/memos/latest-memos';
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { getProfitLossColor } from '@/lib/utils';
@@ -37,7 +39,7 @@ export function HoldingDetailPane({ row, onEdit, onSaveMemo }: {
         {DETAILS.map(([id, label]) => <div key={id}><dt className="pm-muted text-[11px]">{label}</dt><dd className={`break-words tabular-nums ${['profit', 'profitPercent', 'daily'].includes(id) ? getProfitLossColor(Number(row.values[id] ?? 0)) : ''}`}>{formatHoldingCell(row, id)}</dd></div>)}
       </dl>
       <div className="flex flex-1 flex-col gap-2 p-3">
-        <div className="flex items-center justify-between"><h2 className="pm-muted">メモ</h2>{!editing && <button type="button" className="text-[var(--pm-link)]" onClick={() => { setMemo(row.holding.memo ?? ''); setEditing(true); }}>メモを編集</button>}</div>
+        <div className="flex items-center justify-between"><h2 className="pm-muted">ひとこと</h2>{!editing && <button type="button" className="text-[var(--pm-link)]" onClick={() => { setMemo(row.holding.memo ?? ''); setEditing(true); }}>ひとことを編集</button>}</div>
         {editing ? <>
           <textarea aria-label="保有メモ" value={memo} onChange={(event) => setMemo(event.target.value)} disabled={busy} rows={5} className="w-full resize-y rounded border border-[var(--pm-input-border)] bg-[var(--pm-bg)] p-2" />
           <div className="flex gap-2"><button type="button" className="pm-button" disabled={busy} onClick={() => void run(async () => { await onSaveMemo(memo); setEditing(false); })}>保存</button><button type="button" className="pm-button" disabled={busy} onClick={() => setEditing(false)}>キャンセル</button></div>
@@ -45,6 +47,7 @@ export function HoldingDetailPane({ row, onEdit, onSaveMemo }: {
         {error && <p role="alert" className="text-[var(--pm-accent)]">{error}</p>}
         <div className="mt-auto flex gap-2 pt-2"><button type="button" className="pm-button flex-1" disabled={busy} onClick={onEdit}>編集</button>{row.holding.symbol !== 'CASH' && <Link className="pm-button flex-1 text-center" href={`/records?holding=${encodeURIComponent(row.holding.id)}&type=sell`}>売却を記録</Link>}</div>
       </div>
+      <LatestMemos symbol={row.holding.symbol} market={row.holding.market} />
     </aside>
   );
 }

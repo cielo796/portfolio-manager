@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { Holding, Portfolio, TickerPreset, TradeIdea, Transaction, WatchlistItem, WatchlistKey } from '@/types';
+import { Holding, MemoSymbolRow, Portfolio, StockMemo, TickerPreset, TradeIdea, Transaction, WatchlistItem, WatchlistKey } from '@/types';
 import { mockPortfolios } from '@/lib/mock-data';
 import { normalizeSectorKey, resolveHoldingSector, resolveSectorForSymbol } from '@/lib/sectors';
 import { getDb } from './connection';
@@ -61,6 +61,8 @@ type WatchlistItemBackup = Pick<
   | 'updated_at'
 >;
 type TickerPresetBackup = Pick<TickerPreset, 'id' | 'symbol' | 'market' | 'name' | 'created_at' | 'updated_at'>;
+type MemoBackup = Omit<StockMemo, 'symbols' | 'updated_pc' | 'deleted_at' | 'updated_by' | 'price_snapshot'> & { price_snapshot: string | null };
+type SymbolBackup = Omit<MemoSymbolRow, 'deleted_at' | 'updated_by'>;
 
 export interface BackupData {
   portfolios: PortfolioBackup[];
@@ -71,6 +73,11 @@ export interface BackupData {
   tickerPresets: TickerPresetBackup[];
 }
 
+export interface MemoBackupData extends BackupData {
+  stockMemos?: MemoBackup[];
+  memoSymbols?: SymbolBackup[];
+}
+
 function backupRow<T extends { deleted_at?: string | null; updated_by?: string | null }>(row: T) {
   const copy = { ...row };
   delete copy.deleted_at;
@@ -78,7 +85,11 @@ function backupRow<T extends { deleted_at?: string | null; updated_by?: string |
   return copy;
 }
 
-export function exportBackupData(): BackupData {
+export function exportBackupData(): MemoBackupData {
+  const db = getDb();
+  const stockMemos = db.prepare('SELECT * FROM stock_memos WHERE deleted_at IS NULL ORDER BY created_at, id').all() as Array<MemoBackup & { deleted_at?: string | null; updated_by?: string | null }>;
+  const memoSymbols = db.prepare(`SELECT s.* FROM memo_symbols s JOIN stock_memos m ON m.id = s.memo_id
+    WHERE s.deleted_at IS NULL AND m.deleted_at IS NULL ORDER BY s.created_at, s.id`).all() as Array<SymbolBackup & { deleted_at?: string | null; updated_by?: string | null }>;
   return {
     portfolios: listPortfolios().map(backupRow),
     holdings: listHoldings().map(backupRow),
@@ -86,10 +97,11 @@ export function exportBackupData(): BackupData {
     tradeIdeas: listTradeIdeas().map(backupRow),
     watchlistItems: listWatchlistItems().map(backupRow),
     tickerPresets: listTickerPresets().map(backupRow),
+    ...(stockMemos.length ? { stockMemos: stockMemos.map(backupRow), memoSymbols: memoSymbols.map(backupRow) } : {}),
   };
 }
 
-export function importBackupData(data: Partial<BackupData>) {
+export function importBackupData(data: Partial<MemoBackupData>) {
   const db = getDb();
 
   const portfolios = (data.portfolios ?? [])
@@ -257,8 +269,37 @@ export function importBackupData(data: Partial<BackupData>) {
     return Array.from(uniqueBySymbolAndMarket.values());
   })();
 
+  const stockMemos = (data.stockMemos ?? []).map((item) => {
+    if (!item?.id || typeof item.title !== 'string' || !item.title.trim() || typeof item.body !== 'string'
+      || (item.tag != null && !['earnings', 'idea', 'trade', 'news', 'review'].includes(item.tag))) {
+      throw new Error('メモのバックアップが不正です');
+    }
+    const snapshot: unknown = JSON.parse(item.price_snapshot || '{}');
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)
+      || Object.values(snapshot).some((quote) => !quote || typeof quote.price !== 'number'
+        || !Number.isFinite(quote.price) || typeof quote.currency !== 'string' || !Number.isFinite(Date.parse(quote.at)))) {
+      throw new Error('メモの株価記録が不正です');
+    }
+    return { id: item.id, title: item.title, body: item.body, tag: item.tag ?? null,
+      price_snapshot: JSON.stringify(snapshot), transaction_id: item.transaction_id ?? null,
+      created_at: item.created_at ?? new Date().toISOString() };
+  });
+  const memoIds = new Set(stockMemos.map((item) => item.id));
+  const symbolKeys = new Set<string>();
+  const memoSymbols = (data.memoSymbols ?? []).map((item) => {
+    if (!item?.id || !memoIds.has(item.memo_id) || !isValidMarket(item.market) || typeof item.symbol !== 'string' || !item.symbol.trim()) {
+      throw new Error('メモの銘柄紐づけが不正です');
+    }
+    const symbol = item.symbol.toUpperCase().trim();
+    const key = `${item.memo_id}|${symbol}|${item.market}`;
+    if (symbolKeys.has(key)) throw new Error('メモの銘柄紐づけが重複しています');
+    symbolKeys.add(key);
+    return { id: item.id, memo_id: item.memo_id, symbol, market: item.market,
+      created_at: item.created_at ?? new Date().toISOString() };
+  });
+
   // 取込前にID重複を検出し、従来どおり全体を失敗させる
-  const groups = [portfolios, holdings, transactions, tradeIdeas, watchlistItems, tickerPresets];
+  const groups = [portfolios, holdings, transactions, tradeIdeas, watchlistItems, tickerPresets, stockMemos, memoSymbols];
   for (const rows of groups) {
     if (new Set(rows.map((row) => row.id)).size !== rows.length) {
       throw new Error('バックアップ内のIDが重複しています');
@@ -281,6 +322,8 @@ export function importBackupData(data: Partial<BackupData>) {
       ['trade_ideas', tradeIdeas],
       ['watchlist_items', watchlistItems],
       ['ticker_presets', tickerPresets],
+      ['stock_memos', stockMemos],
+      ['memo_symbols', memoSymbols],
     ] as const;
     for (const [table, rows] of entries) {
       for (const row of rows) {
@@ -292,6 +335,12 @@ export function importBackupData(data: Partial<BackupData>) {
           const symbolRow = row as WatchlistItemBackup | TickerPresetBackup;
           const existing = db.prepare(`SELECT id FROM ${table} WHERE symbol = ? AND market = ?`)
             .get(symbolRow.symbol, symbolRow.market) as { id: string } | undefined;
+          if (existing) restored.id = existing.id;
+        }
+        if (table === 'memo_symbols') {
+          const symbolRow = row as typeof memoSymbols[number];
+          const existing = db.prepare('SELECT id FROM memo_symbols WHERE memo_id = ? AND symbol = ? AND market = ?')
+            .get(symbolRow.memo_id, symbolRow.symbol, symbolRow.market) as { id: string } | undefined;
           if (existing) restored.id = existing.id;
         }
         const columns = Object.keys(restored);

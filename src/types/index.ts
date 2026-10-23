@@ -2,6 +2,41 @@ import type { SectorKey } from '@/lib/sectors';
 
 // 市場タイプ
 export type Market = 'US' | 'JP' | 'FX';
+export type MemoTag = 'earnings' | 'idea' | 'trade' | 'news' | 'review';
+export interface MemoSymbol {
+  symbol: string;
+  market: Market;
+}
+export type MemoPriceSnapshot = Record<string, { price: number; currency: string; at: string }>;
+export interface StockMemo {
+  id: string;
+  title: string;
+  body: string;
+  tag: MemoTag | null;
+  price_snapshot: MemoPriceSnapshot;
+  transaction_id: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+  updated_by?: string | null;
+  updated_pc?: string;
+  symbols: MemoSymbol[];
+}
+export interface MemoInput {
+  title: string;
+  body: string;
+  tag?: MemoTag | null;
+  symbols: MemoSymbol[];
+  transactionId?: string | null;
+}
+export interface MemoSymbolRow extends MemoSymbol {
+  id: string;
+  memo_id: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+  updated_by?: string | null;
+}
 export type ChartMarket = Market | 'INDEX';
 export type ChartRange = '3m' | '6m' | '1y' | '5y';
 export type ChartInterval = 'd' | 'w' | 'm';
@@ -325,7 +360,7 @@ export interface ShellSyncLog {
 }
 
 // LAN同期ではDBの全列をそのまま交換する
-export type SyncTable = 'portfolios' | 'holdings' | 'transactions' | 'trade_ideas' | 'ticker_presets' | 'watchlist_items';
+export type SyncTable = 'portfolios' | 'holdings' | 'transactions' | 'trade_ideas' | 'ticker_presets' | 'watchlist_items' | 'stock_memos' | 'memo_symbols';
 export type SyncValue = string | number | null;
 export interface SyncRow {
   [column: string]: SyncValue;

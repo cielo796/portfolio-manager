@@ -18,7 +18,26 @@ const MIGRATIONS: Array<{
   { version: 5, name: 'fundamentals-cache', up: createFundamentalsCache },
   { version: 6, name: 'stock-price-volume', up: addStockPriceVolume },
   { version: 7, name: 'transaction-ledger', up: addTransactionLedger },
+  { version: 8, name: 'stock-memos', up: createStockMemos },
 ];
+
+function createStockMemos(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS stock_memos (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL DEFAULT '',
+      tag TEXT, price_snapshot TEXT, transaction_id TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT, updated_by TEXT
+    );
+    CREATE TABLE IF NOT EXISTS memo_symbols (
+      id TEXT PRIMARY KEY, memo_id TEXT NOT NULL, symbol TEXT NOT NULL, market TEXT NOT NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT, updated_by TEXT,
+      UNIQUE(memo_id, symbol, market)
+    );
+    CREATE INDEX IF NOT EXISTS idx_stock_memos_updated_at ON stock_memos(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_memo_symbols_updated_at ON memo_symbols(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_memo_symbols_symbol ON memo_symbols(symbol, market, memo_id);
+  `);
+}
 
 function addTransactionLedger(db: Database.Database) {
   for (const [table, columns] of [
@@ -81,6 +100,8 @@ function createSyncSchema(db: Database.Database) {
     );
   `);
   for (const table of SYNC_TABLES) {
+    // 後続のマイグレーションで作るテーブルは、その版で同期列も作る
+    if (table === 'stock_memos' || table === 'memo_symbols') continue;
     db.exec(`
       ALTER TABLE ${table} ADD COLUMN deleted_at TEXT;
       ALTER TABLE ${table} ADD COLUMN updated_by TEXT;

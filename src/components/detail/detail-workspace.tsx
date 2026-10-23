@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { LatestMemos } from '@/components/memos/latest-memos';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { ChartData, DetailSymbol, FundamentalMetrics, Holding, NewsItem, StockPrice, Transaction, WatchlistItem, WatchlistKey } from '@/types';
@@ -108,5 +109,6 @@ function DetailContent({ selected, holdings, watchlist, cachedPrice }: { selecte
       </div>
     </section>
     <MetricsPane holdings={owned} price={price} metrics={fundamentals.data?.fundamentals[key]} loading={fundamentals.loading} error={fundamentals.error} />
+    <div className={`${panel} min-[1100px]:col-span-2`}><LatestMemos symbol={symbol} market={market} /></div>
   </div>;
 }

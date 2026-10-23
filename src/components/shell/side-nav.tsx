@@ -13,6 +13,7 @@ const navigation = [
   { name: '銘柄詳細', href: '/detail', icon: ChartCandlestick },
   { name: 'マーケット', href: '/market', icon: ChartNoAxesCombined },
   { name: 'ニュース', href: '/news', icon: Newspaper },
+  { name: '銘柄メモ', href: '/memos', icon: NotebookPen },
   { name: '記録', href: '/records', icon: NotebookPen },
   { name: '設定', href: '/settings', icon: Settings },
 ];

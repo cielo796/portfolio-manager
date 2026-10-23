@@ -4,10 +4,10 @@ import type Database from 'better-sqlite3';
 import type { SyncApplyResult, SyncChanges, SyncRow, SyncTable } from '@/types';
 import { SyncError, validTime } from './state';
 
-export const tables: SyncTable[] = ['portfolios', 'holdings', 'transactions', 'trade_ideas', 'ticker_presets', 'watchlist_items'];
+export const tables: SyncTable[] = ['portfolios', 'holdings', 'transactions', 'trade_ideas', 'ticker_presets', 'watchlist_items', 'stock_memos', 'memo_symbols'];
 
 export function emptyChanges(): SyncChanges {
-  return { portfolios: [], holdings: [], transactions: [], trade_ideas: [], ticker_presets: [], watchlist_items: [] };
+  return { portfolios: [], holdings: [], transactions: [], trade_ideas: [], ticker_presets: [], watchlist_items: [], stock_memos: [], memo_symbols: [] };
 }
 
 export function collectChanges(db: Database.Database, since: string | null, excludeDeviceId?: string): SyncChanges {
@@ -67,7 +67,9 @@ export function applyChanges(db: Database.Database, changes: SyncChanges, option
       for (const remote of changes[table]) {
         let local = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(remote.id) as SyncRow | undefined;
         const unique = table === 'watchlist_items' || table === 'ticker_presets';
-        const sameSymbol = unique
+        const sameSymbol = table === 'memo_symbols'
+          ? db.prepare('SELECT * FROM memo_symbols WHERE memo_id = ? AND symbol = ? AND market = ? AND id != ?').get(remote.memo_id, remote.symbol, remote.market, remote.id) as SyncRow | undefined
+          : unique
           ? db.prepare(`SELECT * FROM ${table} WHERE symbol = ? AND market = ? AND id != ?`).get(remote.symbol, remote.market, remote.id) as SyncRow | undefined
           : undefined;
         if (sameSymbol && local) throw new SyncError('同一IDの銘柄が一致しません。');
