@@ -10,8 +10,11 @@ export const metadata: Metadata = {
   title: 'Portfolio Manager - 投資ポートフォリオ管理',
   description: '米国株・日本株・FXを一元管理する投資ポートフォリオ管理アプリ',
   icons: {
-    icon: [{ url: '/brand-mark.svg', type: 'image/svg+xml' }, { url: '/favicon.ico' }],
-    apple: '/app-icon.png',
+    icon: [
+      { url: '/favicon.ico', type: 'image/x-icon', sizes: '16x16 32x32 48x48' },
+      { url: '/app-icon-small.svg', type: 'image/svg+xml', sizes: 'any' },
+    ],
+    apple: [{ url: '/app-icon.png', type: 'image/png', sizes: '512x512' }],
   },
 };
 

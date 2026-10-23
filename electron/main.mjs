@@ -7,6 +7,8 @@ import { startSyncRelay } from './sync-relay.mjs';
 
 const { app, BrowserWindow, shell } = electron;
 
+app.setAppUserModelId('com.cielo.portfolio-manager');
+
 const START_URL = process.env.ELECTRON_START_URL;
 const packagedBasePort = Number(process.env.DESKTOP_PORT || 38400);
 const maxPortScan = 30;
@@ -134,6 +136,10 @@ const startBundledServer = async () => {
 };
 
 function createWindow(startUrl) {
+  const windowsIcon = path.join(app.getAppPath(), 'build', 'icon.ico');
+  const icon = process.platform === 'win32' && fs.existsSync(windowsIcon)
+    ? windowsIcon
+    : path.join(app.getAppPath(), 'public', 'app-icon.png');
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -141,7 +147,7 @@ function createWindow(startUrl) {
     minHeight: 720,
     autoHideMenuBar: true,
     title: 'Portfolio Manager',
-    icon: path.join(app.getAppPath(), 'public', 'app-icon.png'),
+    icon,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

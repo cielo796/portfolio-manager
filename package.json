@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "icons": "node scripts/generate-icons.mjs",
     "desktop": "npm run desktop:start",
     "desktop:dev": "node electron/desktop-runner.mjs dev",
     "desktop:start": "node electron/desktop-runner.mjs start"
@@ -36,6 +37,8 @@
     "electron": "^37.7.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.12",
