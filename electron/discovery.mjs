@@ -201,13 +201,27 @@ export async function startDiscovery({ self, port, onPeer, log = () => {}, socke
   }, 1000);
   repeat.unref();
   timer.unref();
+  let closing;
   return { activeInterfaces: sockets.length, close: () => {
+    if (closing) return closing;
+    closed = true;
     clearInterval(timer);
     clearTimeout(repeat);
-    for (const { socket, address } of sockets) {
-      socket.send(announcement(self, address, port, 0), PORT, GROUP, () => { try { socket.close(); } catch { /* 終了済み */ } });
-    }
-    closed = true;
     cache.clear();
+    closing = Promise.all(sockets.map(({ socket, address }) => new Promise((resolve) => {
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(deadline);
+        try { socket.close(); } catch { /* 終了済み */ }
+        resolve();
+      };
+      // goodbye送信のコールバックが来なくてもソケットを閉じる。
+      const deadline = setTimeout(finish, 500);
+      try { socket.send(announcement(self, address, port, 0), PORT, GROUP, finish); }
+      catch { finish(); }
+    })));
+    return closing;
   } };
 }

@@ -128,9 +128,10 @@ export const startSyncRelay = ({ listenPort, targetOrigin, log = () => {} }) =>
       server.on('error', (error) => log(`[sync-relay] ${error.message}`));
       const port = server.address().port;
       log(`[sync-relay] Listening on 0.0.0.0:${port}`);
+      let closing;
       resolve({
         port,
-        close: () => new Promise((resolveClose, rejectClose) => {
+        close: () => closing ||= new Promise((resolveClose, rejectClose) => {
           server.close((error) => error ? rejectClose(error) : resolveClose());
           for (const upstream of upstreamRequests) upstream.destroy();
           for (const socket of sockets) socket.destroy();

@@ -47,3 +47,4 @@ next-env.d.ts
 /.qa-watchlist/
 /dist-desktop/
 /data/*.log
+/data/logs/

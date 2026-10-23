@@ -13,7 +13,9 @@
     "icons": "node scripts/generate-icons.mjs",
     "desktop": "npm run desktop:start",
     "desktop:dev": "node electron/desktop-runner.mjs dev",
-    "desktop:start": "node electron/desktop-runner.mjs start"
+    "desktop:start": "node electron/desktop-runner.mjs start",
+    "desktop:shortcuts": "node scripts/create-shortcuts.mjs",
+    "test:desktop": "vitest run --config electron/vitest.config.mjs"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
