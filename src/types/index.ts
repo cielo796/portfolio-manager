@@ -102,6 +102,9 @@ export interface Transaction {
   price: number;
   total_amount: number;
   fees: number;
+  realized_pl?: number | null;
+  fx_rate?: number | null;
+  holding_id?: string | null;
   transaction_date: string;
   memo?: string;
   created_at: string;

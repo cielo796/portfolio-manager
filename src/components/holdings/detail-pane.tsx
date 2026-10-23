@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { getProfitLossColor } from '@/lib/utils';
 import { formatHoldingCell, type HoldingColumnId, type HoldingRow } from './columns';
 
@@ -10,7 +11,7 @@ const DETAILS: [HoldingColumnId, string][] = [
   ['sector', 'セクター'], ['account', '口座'],
 ];
 
-export function HoldingDetailPane({ row, onEdit, onClosePosition, onSaveMemo }: {
+export function HoldingDetailPane({ row, onEdit, onSaveMemo }: {
   row: HoldingRow | undefined;
   onEdit: () => void;
   onClosePosition: () => Promise<void>;
@@ -42,9 +43,7 @@ export function HoldingDetailPane({ row, onEdit, onClosePosition, onSaveMemo }: 
           <div className="flex gap-2"><button type="button" className="pm-button" disabled={busy} onClick={() => void run(async () => { await onSaveMemo(memo); setEditing(false); })}>保存</button><button type="button" className="pm-button" disabled={busy} onClick={() => setEditing(false)}>キャンセル</button></div>
         </> : <p className="min-h-16 whitespace-pre-wrap break-words">{row.holding.memo || <span className="pm-muted">メモはありません。</span>}</p>}
         {error && <p role="alert" className="text-[var(--pm-accent)]">{error}</p>}
-        <div className="mt-auto flex gap-2 pt-2"><button type="button" className="pm-button flex-1" disabled={busy} onClick={onEdit}>編集</button><button type="button" className="pm-button flex-1" disabled={busy} onClick={() => {
-          if (confirm(`「${row.holding.symbol}」を決済して保有一覧から削除します。よろしいですか？`)) void run(onClosePosition);
-        }}>決済</button></div>
+        <div className="mt-auto flex gap-2 pt-2"><button type="button" className="pm-button flex-1" disabled={busy} onClick={onEdit}>編集</button>{row.holding.symbol !== 'CASH' && <Link className="pm-button flex-1 text-center" href={`/records?holding=${encodeURIComponent(row.holding.id)}&type=sell`}>売却を記録</Link>}</div>
       </div>
     </aside>
   );

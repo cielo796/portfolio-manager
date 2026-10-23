@@ -17,7 +17,24 @@ const MIGRATIONS: Array<{
   { version: 4, name: 'price-history-cache', up: createPriceHistory },
   { version: 5, name: 'fundamentals-cache', up: createFundamentalsCache },
   { version: 6, name: 'stock-price-volume', up: addStockPriceVolume },
+  { version: 7, name: 'transaction-ledger', up: addTransactionLedger },
 ];
+
+function addTransactionLedger(db: Database.Database) {
+  for (const [table, columns] of [
+    ['transactions', [['realized_pl', 'REAL'], ['fx_rate', 'REAL'], ['holding_id', 'TEXT']]],
+    ['holdings', [['ledger_opening_shares', 'REAL'], ['ledger_opening_cost', 'REAL']]],
+  ] as const) {
+    const existing = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    for (const [name, type] of columns) {
+      if (!existing.some((column) => column.name === name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`);
+    }
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_transactions_holding ON transactions(holding_id)');
+  db.exec(`CREATE TRIGGER IF NOT EXISTS keep_ledger_holding BEFORE DELETE ON holdings
+    WHEN EXISTS (SELECT 1 FROM transactions WHERE holding_id = OLD.id AND deleted_at IS NULL)
+    BEGIN SELECT RAISE(IGNORE); END`);
+}
 
 function addStockPriceVolume(db: Database.Database) {
   const columns = db.prepare('PRAGMA table_info(stock_prices)').all() as Array<{ name: string }>;

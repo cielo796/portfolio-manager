@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
+import Link from 'next/link';
 import { HoldingWithPrice } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
@@ -42,6 +43,7 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
   });
   const [errors, setErrors] = useState<Partial<Record<keyof EditHoldingData, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!holding || !isOpen) return;
@@ -53,6 +55,7 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
       memo: holding.memo || '',
     });
     setErrors({});
+    setConfirmDelete(false);
   }, [holding, isCash, isFx, isOpen]);
 
   const currency = useMemo(() => {
@@ -97,8 +100,7 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
 
   const handleClosePosition = async () => {
     if (!holding) return;
-    const confirmed = confirm(`「${holding.symbol}」を決済して保有一覧から削除します。よろしいですか？`);
-    if (!confirmed) return;
+    if (!confirmDelete) { setConfirmDelete(true); return; }
 
     setIsSubmitting(true);
     try {
@@ -187,9 +189,10 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
             onChange={(e) => setFormData((prev) => ({ ...prev, memo: e.target.value }))}
           />
 
+          {!isCash && <Link className="pm-button block text-center" href={`/records?holding=${encodeURIComponent(holding.id)}&type=sell`}>売却を記録</Link>}
           <div className="flex gap-2 pt-4">
             <Button type="button" variant="danger" onClick={handleClosePosition} disabled={isSubmitting} className="flex-1">
-              決済
+              {confirmDelete ? '再度押して削除' : '保有を削除（記録なし）'}
             </Button>
             <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting} className="flex-1">
               キャンセル
