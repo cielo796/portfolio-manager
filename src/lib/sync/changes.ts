@@ -96,7 +96,7 @@ export function applyChanges(db: Database.Database, changes: SyncChanges, option
       }
     }
     const activePicks = db.prepare('SELECT COUNT(*) AS n FROM top_picks WHERE removed_at IS NULL AND deleted_at IS NULL').get() as { n: number };
-    if (activePicks.n > 10) throw new SyncError('同期後の現在のピックが10件を超えます。不要なピックを外して再同期してください。', 409);
+    if (activePicks.n > 10) throw new SyncError(`トップピックが合計 ${activePicks.n} 件（上限 10 件）になるため同期を中止しました。どちらかの PC でピックを外してから、もう一度同期してください。データは変更されていません。`, 409);
     return result;
   })();
 }

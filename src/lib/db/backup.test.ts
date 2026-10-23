@@ -67,6 +67,115 @@ describe('一時DBでのバックアップと価格マップ', () => {
     if (directory) rmSync(directory, { recursive: true, force: true });
   });
 
+  it('最初に接続先が一時DBであることを確認する', () => {
+    expect(testDb?.name).toBe(join(directory!, 'test.db'));
+  });
+
+  it('別の一時DBへのJSON往復で記録連動の5列と自分の更新情報を復元する', async () => {
+    const holding = fixture.holdings[0];
+    const transaction = fixture.transactions[0];
+    testDb!.prepare('UPDATE holdings SET ledger_opening_shares = 2.5, ledger_opening_cost = 123.45 WHERE id = ?').run(holding.id);
+    testDb!.prepare('UPDATE transactions SET realized_pl = -12.5, fx_rate = 150.25, holding_id = ? WHERE id = ?')
+      .run(holding.id, transaction.id);
+    const exported = JSON.parse(JSON.stringify(dbApi.exportBackupData())) as BackupData;
+    expect(exported.holdings.find((item) => item.id === holding.id)).toMatchObject({ ledger_opening_shares: 2.5, ledger_opening_cost: 123.45 });
+    expect(exported.transactions.find((item) => item.id === transaction.id)).toMatchObject({ realized_pl: -12.5, fx_rate: 150.25, holding_id: holding.id });
+
+    const { openDatabase } = await import('@/lib/db/connection');
+    const destinationPath = join(directory!, 'roundtrip.db');
+    const destination = openDatabase(destinationPath);
+    try {
+      expect(destination.name).toBe(destinationPath);
+      dbGlobal.__portfolioDb = destination;
+      dbGlobal.__portfolioDbInitialized = true;
+      dbApi.importBackupData(exported);
+      const restored = dbApi.exportBackupData();
+      expect(content(restored)).toEqual(content(exported));
+      const device = destination.prepare("SELECT value FROM sync_meta WHERE key = 'device_id'").get() as { value: string };
+      for (const [table, id] of [['holdings', holding.id], ['transactions', transaction.id]]) {
+        expect(destination.prepare(`SELECT updated_by, deleted_at FROM ${table} WHERE id = ?`).get(id))
+          .toEqual({ updated_by: device.value, deleted_at: null });
+      }
+    } finally {
+      dbGlobal.__portfolioDb = testDb;
+      destination.close();
+    }
+  });
+
+  it('旧形式JSONを同じIDに取り込むと既存の連動5列もnullで上書きする', () => {
+    testDb!.prepare('UPDATE holdings SET ledger_opening_shares = 0, ledger_opening_cost = 0').run();
+    testDb!.prepare('UPDATE transactions SET realized_pl = 10, fx_rate = 150, holding_id = ?').run(fixture.holdings[0].id);
+    dbApi.importBackupData(JSON.parse(JSON.stringify(fixture)));
+    expect(testDb!.prepare('SELECT DISTINCT ledger_opening_shares, ledger_opening_cost FROM holdings WHERE deleted_at IS NULL').all())
+      .toEqual([{ ledger_opening_shares: null, ledger_opening_cost: null }]);
+    expect(testDb!.prepare('SELECT DISTINCT realized_pl, fx_rate, holding_id FROM transactions WHERE deleted_at IS NULL').all())
+      .toEqual([{ realized_pl: null, fx_rate: null, holding_id: null }]);
+  });
+
+  it('null・ゼロ・負の有限数を変換せず取り込む', () => {
+    dbApi.importBackupData({ ...fixture,
+      holdings: [{ ...fixture.holdings[0], ledger_opening_shares: 0, ledger_opening_cost: null }],
+      transactions: [{ ...fixture.transactions[0], realized_pl: -10, fx_rate: 0, holding_id: null }],
+    });
+    const restored = dbApi.exportBackupData();
+    expect(restored.holdings[0]).toMatchObject({ ledger_opening_shares: 0, ledger_opening_cost: null });
+    expect(restored.transactions[0]).toMatchObject({ realized_pl: -10, fx_rate: 0, holding_id: null });
+  });
+
+  it.each(['missing', 'filtered', 'tombstone'])('取込対象にない保有への参照をnullにする（%s）', (target) => {
+    const holding = fixture.holdings[0];
+    if (target === 'tombstone') testDb!.prepare('UPDATE holdings SET deleted_at = ? WHERE id = ?').run(timestamp, holding.id);
+    dbApi.importBackupData({ ...fixture,
+      holdings: target === 'filtered' ? [{ ...holding, shares: 0 }] : [],
+      transactions: [{ ...fixture.transactions[0], holding_id: target === 'missing' ? 'no-such-holding' : holding.id }],
+    });
+    expect(dbApi.exportBackupData().transactions[0].holding_id).toBeNull();
+    expect(testDb!.prepare('SELECT deleted_at FROM holdings WHERE id = ?').get(holding.id))
+      .toMatchObject({ deleted_at: expect.any(String) });
+  });
+
+  it('取込対象の論理削除済み保有は復活し、連動先を物理削除から保護する', () => {
+    const holding = fixture.holdings[0];
+    testDb!.prepare('UPDATE holdings SET deleted_at = ? WHERE id = ?').run(timestamp, holding.id);
+    dbApi.importBackupData({ ...fixture,
+      holdings: [{ ...holding, ledger_opening_shares: 0, ledger_opening_cost: 0 }],
+      transactions: [{ ...fixture.transactions[0], holding_id: holding.id, realized_pl: 42, fx_rate: 150 }],
+    });
+    expect(testDb!.prepare('SELECT deleted_at, ledger_opening_shares, ledger_opening_cost FROM holdings WHERE id = ?').get(holding.id))
+      .toEqual({ deleted_at: null, ledger_opening_shares: 0, ledger_opening_cost: 0 });
+    testDb!.prepare('UPDATE holdings SET deleted_at = ? WHERE id = ?').run(timestamp, holding.id);
+    expect(testDb!.prepare('DELETE FROM holdings WHERE id = ?').run(holding.id).changes).toBe(0);
+    expect(dbApi.exportBackupData().transactions[0].holding_id).toBe(holding.id);
+    // 書出し対象外の決済済み保有は、再取込で壊れた参照を残さない
+    const exported = dbApi.exportBackupData();
+    expect(exported.holdings).toEqual([]);
+    dbApi.importBackupData(exported);
+    expect(dbApi.exportBackupData().transactions[0].holding_id).toBeNull();
+  });
+
+  const numericColumns = [
+    ['holdings', 'ledger_opening_shares'], ['holdings', 'ledger_opening_cost'],
+    ['transactions', 'realized_pl'], ['transactions', 'fx_rate'],
+  ] as const;
+  it.each(numericColumns)('%s.%sの非数値・非有限数を拒否し、取込前のデータを保つ', (table, column) => {
+    const before = dbApi.exportBackupData();
+    for (const invalid of ['12', true, {}, [], Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      const data = { ...fixture, [table]: [{ ...fixture[table][0], [column]: invalid }] };
+      expect(() => dbApi.importBackupData(data)).toThrow(column);
+      expect(dbApi.exportBackupData()).toEqual(before);
+    }
+  });
+
+  it('文字列以外のholding_idを拒否し、取込前のデータを保つ', () => {
+    const before = dbApi.exportBackupData();
+    for (const invalid of [42, true, {}, []]) {
+      const data = JSON.parse(JSON.stringify(fixture));
+      data.transactions[0].holding_id = invalid;
+      expect(() => dbApi.importBackupData(data)).toThrow('holding_id');
+      expect(dbApi.exportBackupData()).toEqual(before);
+    }
+  });
+
   it('通常の書き出し→JSON→取込で全種類の件数と内容が一致する', () => {
     const exported = dbApi.exportBackupData();
     expect(counts(exported)).toEqual(counts(fixture));

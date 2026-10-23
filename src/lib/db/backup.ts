@@ -25,6 +25,8 @@ type HoldingBackup = Pick<
   | 'market'
   | 'shares'
   | 'avg_cost'
+  | 'ledger_opening_shares'
+  | 'ledger_opening_cost'
   | 'sort_order'
   | 'sector'
   | 'memo'
@@ -42,6 +44,9 @@ type TransactionBackup = Pick<
   | 'price'
   | 'total_amount'
   | 'fees'
+  | 'realized_pl'
+  | 'fx_rate'
+  | 'holding_id'
   | 'transaction_date'
   | 'memo'
   | 'created_at'
@@ -95,14 +100,27 @@ export function exportBackupData(): MemoBackupData {
     WHERE s.deleted_at IS NULL AND m.deleted_at IS NULL ORDER BY s.created_at, s.id`).all() as Array<SymbolBackup & { deleted_at?: string | null; updated_by?: string | null }>;
   return {
     portfolios: listPortfolios().map(backupRow),
-    holdings: listHoldings().map(backupRow),
-    transactions: listTransactions().map(backupRow),
+    holdings: listHoldings().map((row) => backupRow({ ...row,
+      ledger_opening_shares: row.ledger_opening_shares ?? null,
+      ledger_opening_cost: row.ledger_opening_cost ?? null,
+    })),
+    transactions: listTransactions().map((row) => backupRow({ ...row,
+      realized_pl: row.realized_pl ?? null, fx_rate: row.fx_rate ?? null, holding_id: row.holding_id ?? null,
+    })),
     tradeIdeas: listTradeIdeas().map(backupRow),
     watchlistItems: listWatchlistItems().map(backupRow),
     tickerPresets: listTickerPresets().map(backupRow),
     ...(stockMemos.length ? { stockMemos: stockMemos.map(backupRow), memoSymbols: memoSymbols.map(backupRow) } : {}),
     ...(topPicks.length ? { topPicks: topPicks.map(backupRow) } : {}),
   };
+}
+
+function nullableLedgerNumber(value: unknown, column: string): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`バックアップの${column}は有限数またはnullで指定してください`);
+  }
+  return value;
 }
 
 export function importBackupData(data: Partial<MemoBackupData>) {
@@ -132,6 +150,8 @@ export function importBackupData(data: Partial<MemoBackupData>) {
       market: item.market,
       shares: Number(item.shares ?? 0),
       avg_cost: Number(item.avg_cost ?? 0),
+      ledger_opening_shares: nullableLedgerNumber(item.ledger_opening_shares, 'ledger_opening_shares'),
+      ledger_opening_cost: nullableLedgerNumber(item.ledger_opening_cost, 'ledger_opening_cost'),
       sort_order: Number.isInteger(item.sort_order) && item.sort_order >= 0 ? item.sort_order : index,
       sector: resolveHoldingSector(item.symbol, item.market, item.sector),
       memo: item.memo ?? null,
@@ -140,6 +160,7 @@ export function importBackupData(data: Partial<MemoBackupData>) {
     }))
     .filter((item) => item.shares > 0 && item.avg_cost >= 0 && isValidMarket(item.market));
 
+  const holdingIds = new Set(holdings.map((item) => item.id));
   const transactions = (data.transactions ?? [])
     .filter(
       (item): item is TransactionBackup =>
@@ -153,20 +174,29 @@ export function importBackupData(data: Partial<MemoBackupData>) {
         )
     )
     .filter((item) => portfolioIds.has(item.portfolio_id))
-    .map((item) => ({
-      id: item.id,
-      portfolio_id: item.portfolio_id,
-      symbol: item.symbol.toUpperCase().trim(),
-      market: item.market,
-      type: item.type,
-      shares: Number(item.shares ?? 0),
-      price: Number(item.price ?? 0),
-      total_amount: Number(item.total_amount ?? Number(item.shares ?? 0) * Number(item.price ?? 0)),
-      fees: Number(item.fees ?? 0),
-      transaction_date: item.transaction_date,
-      memo: item.memo ?? null,
-      created_at: item.created_at ?? new Date().toISOString(),
-    }))
+    .map((item) => {
+      if (item.holding_id != null && typeof item.holding_id !== 'string') {
+        throw new Error('バックアップのholding_idは文字列またはnullで指定してください');
+      }
+      return {
+        id: item.id,
+        portfolio_id: item.portfolio_id,
+        symbol: item.symbol.toUpperCase().trim(),
+        market: item.market,
+        type: item.type,
+        shares: Number(item.shares ?? 0),
+        price: Number(item.price ?? 0),
+        total_amount: Number(item.total_amount ?? Number(item.shares ?? 0) * Number(item.price ?? 0)),
+        fees: Number(item.fees ?? 0),
+        realized_pl: nullableLedgerNumber(item.realized_pl, 'realized_pl'),
+        fx_rate: nullableLedgerNumber(item.fx_rate, 'fx_rate'),
+        // 取込で復活する保有だけを参照し、既存の論理削除行には紐づけない
+        holding_id: item.holding_id != null && holdingIds.has(item.holding_id) ? item.holding_id : null,
+        transaction_date: item.transaction_date,
+        memo: item.memo ?? null,
+        created_at: item.created_at ?? new Date().toISOString(),
+      };
+    })
     .filter(
       (item) =>
         isValidMarket(item.market) &&

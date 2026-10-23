@@ -164,6 +164,8 @@ export interface Holding {
   market: Market;
   shares: number;
   avg_cost: number;
+  ledger_opening_shares?: number | null;
+  ledger_opening_cost?: number | null;
   sort_order: number;
   sector?: string;
   memo?: string;

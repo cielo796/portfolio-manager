@@ -143,7 +143,8 @@ describe('LAN同期エンジン・API', () => {
       put(b, 'top_picks', { id: `b-${i}`, symbol: 'AMD', market: 'US', rank: i + 1, picked_at: '2026-10-01', picked_price: 80 });
     }
     idea(b);
-    expect(() => sync.applyChanges(a, sync.collectChanges(b, null), { lastSyncedAt: null })).toThrow('10件');
+    expect(() => sync.applyChanges(a, sync.collectChanges(b, null), { lastSyncedAt: null }))
+      .toThrow(/合計 12 件（上限 10 件）.*外して.*データは変更されていません/);
     expect(sync.collectChanges(a, null).top_picks).toHaveLength(6);
     expect(sync.collectChanges(b, null).top_picks).toHaveLength(6);
     expect(row(a, 'trade_ideas', 'idea')).toBeUndefined();
@@ -151,6 +152,32 @@ describe('LAN同期エンジン・API', () => {
     sync.applyChanges(a, sync.collectChanges(b, null), { lastSyncedAt: null });
     expect(a.prepare('SELECT COUNT(*) AS n FROM top_picks WHERE removed_at IS NULL AND deleted_at IS NULL').get()).toEqual({ n: 10 });
     expect(sync.collectChanges(a, null).top_picks).toHaveLength(12);
+  });
+
+  it.each([false, true])('トップピック上限の409と案内がHTTP経由で画面用API・失敗ログに届く（相手側で検出=%s）', async (remote) => {
+    for (let i = 0; i < 6; i++) {
+      put(a, 'top_picks', { id: `a-${i}`, symbol: 'NVDA', market: 'US', rank: i + 1, picked_at: '2026-10-01', picked_price: 100 });
+      put(b, 'top_picks', { id: `b-${i}`, symbol: 'AMD', market: 'US', rank: i + 1, picked_at: '2026-10-01', picked_price: 80 });
+    }
+    // 相手にだけ残る過去の行がpullに含まれず、push時に超過が判明する経路も通す
+    if (remote) a.prepare('UPDATE sync_peers SET last_pulled_until = ?').run('2026-10-22T00:10:00.000Z');
+    const beforeA = sync.collectChanges(a, null);
+    const beforeB = sync.collectChanges(b, null);
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const incoming = new Request(input, init);
+      const action = new URL(incoming.url).pathname.split('/').pop() as 'ping' | 'changes' | 'apply';
+      return api.handleSync(incoming, action, undefined, b);
+    });
+    const response = await request('run', 'POST', { peerId: peer.id });
+    expect(response.status).toBe(409);
+    const { error } = await response.json();
+    expect(error).toBe('トップピックが合計 12 件（上限 10 件）になるため同期を中止しました。どちらかの PC でピックを外してから、もう一度同期してください。データは変更されていません。');
+    expect(sync.collectChanges(a, null)).toEqual(beforeA);
+    expect(sync.collectChanges(b, null)).toEqual(beforeB);
+    const log = a.prepare('SELECT status, detail FROM sync_log').get() as { status: string; detail: string };
+    expect(log.status).toBe('failed');
+    expect(JSON.parse(log.detail).error).toBe(error);
+    expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/apply'))).toBe(remote);
   });
 
   it('全6テーブルを外部キー順に送信し、Bの編集をAへ反映する', async () => {
