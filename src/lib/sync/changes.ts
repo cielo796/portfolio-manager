@@ -3,11 +3,13 @@ import 'server-only';
 import type Database from 'better-sqlite3';
 import type { SyncApplyResult, SyncChanges, SyncRow, SyncTable } from '@/types';
 import { SyncError, validTime } from './state';
+import { snapshotId, validSnapshot } from '@/components/history/model';
+import type { SnapshotInput } from '@/types';
 
-export const tables: SyncTable[] = ['portfolios', 'holdings', 'transactions', 'trade_ideas', 'ticker_presets', 'watchlist_items', 'stock_memos', 'memo_symbols', 'top_picks'];
+export const tables: SyncTable[] = ['portfolios', 'holdings', 'transactions', 'trade_ideas', 'ticker_presets', 'watchlist_items', 'stock_memos', 'memo_symbols', 'top_picks', 'portfolio_snapshots'];
 
 export function emptyChanges(): SyncChanges {
-  return { portfolios: [], holdings: [], transactions: [], trade_ideas: [], ticker_presets: [], watchlist_items: [], stock_memos: [], memo_symbols: [], top_picks: [] };
+  return { portfolios: [], holdings: [], transactions: [], trade_ideas: [], ticker_presets: [], watchlist_items: [], stock_memos: [], memo_symbols: [], top_picks: [], portfolio_snapshots: [] };
 }
 
 export function collectChanges(db: Database.Database, since: string | null, excludeDeviceId?: string): SyncChanges {
@@ -39,6 +41,12 @@ export function validateChanges(db: Database.Database, value: unknown): asserts 
       }) || typeof row.id !== 'string' || !row.id || ids.has(row.id)
         || !validTime(row.updated_at) || !validTime(row.created_at)
         || (row.deleted_at !== null && !validTime(row.deleted_at))) throw new SyncError(`${table}の行データが不正です。`);
+      if (table === 'portfolio_snapshots') {
+        const snapshot = row as unknown as SnapshotInput;
+        if (!validSnapshot(snapshot) || row.id !== snapshotId(snapshot.snapshot_date, snapshot.portfolio_id)) {
+          throw new SyncError('資産記録のID・値が不正です。');
+        }
+      }
       ids.add(row.id);
     }
   }
@@ -74,7 +82,8 @@ export function applyChanges(db: Database.Database, changes: SyncChanges, option
           : undefined;
         if (sameSymbol && local) throw new SyncError('同一IDの銘柄が一致しません。');
         local ??= sameSymbol;
-        const remoteWins = !local || newer(remote, local);
+        const differentKind = table === 'portfolio_snapshots' && local && remote.is_estimate !== local.is_estimate;
+        const remoteWins = !local || (differentKind ? remote.is_estimate === 0 : newer(remote, local));
         if (local && (options.lastSyncedAt === null || Date.parse(local.updated_at) > Date.parse(options.lastSyncedAt)) && differentContent(remote, local)) {
           result.conflicts++;
           result.conflictDetails.push({ table, id: local.id < remote.id ? local.id : remote.id,
@@ -92,7 +101,7 @@ export function applyChanges(db: Database.Database, changes: SyncChanges, option
           result.skipped++;
         }
         // 更新元を保ったID統合結果は、通常の送り返し除外とは別に相手へ伝える
-        if (remapped) result.canonicalChanges[table].push(winner);
+        if (remapped || differentKind) result.canonicalChanges[table].push(winner);
       }
     }
     const activePicks = db.prepare('SELECT COUNT(*) AS n FROM top_picks WHERE removed_at IS NULL AND deleted_at IS NULL').get() as { n: number };

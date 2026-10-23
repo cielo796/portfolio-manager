@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listHoldings, listNewsItems, listPortfolios, listStockPrices, listTransactions } from '@/lib/db';
+import { listHoldings, listNewsItems, listPortfolios, listStockPrices, listTransactions, recordCurrentSnapshots } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -10,6 +10,7 @@ export async function GET() {
   const transactions = listTransactions();
   const stockPrices = listStockPrices();
   const news = listNewsItems();
+  recordCurrentSnapshots();
 
   return NextResponse.json({
     portfolios,

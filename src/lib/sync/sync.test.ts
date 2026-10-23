@@ -97,6 +97,38 @@ describe('LAN同期エンジン・API', () => {
     expect(a.prepare('SELECT COUNT(*) AS n FROM holdings').get()).toEqual({ n: 0 });
   });
 
+  it.each([true, false])('同じ日の資産記録は1件に収束し、古い実測も新しい推計より優先する（実測がA=%s）', async (actualOnA) => {
+    const snapshot = { id: '2026-10-22|ALL', snapshot_date: '2026-10-22', portfolio_id: null,
+      market_value_jpy: 100, cost_basis_jpy: 80, cash_jpy: 0, usd_jpy: 150 };
+    const oldActual = '2026-10-21T00:00:00.000Z';
+    put(a, 'portfolio_snapshots', { ...snapshot, is_estimate: actualOnA ? 0 : 1, updated_at: actualOnA ? oldActual : latest });
+    put(b, 'portfolio_snapshots', { ...snapshot, market_value_jpy: 200, is_estimate: actualOnA ? 1 : 0, updated_at: actualOnA ? latest : oldActual });
+    // 古い実測が差分の対象外でも、優先判定の結果を送り返す。
+    a.prepare('UPDATE sync_peers SET last_pulled_until = ?, last_pushed_until = ?').run(edited, edited);
+    await engine.runSync(a, peer, direct());
+    expect(sync.collectChanges(a, null)).toEqual(sync.collectChanges(b, null));
+    expect(a.prepare('SELECT * FROM portfolio_snapshots').all()).toHaveLength(1);
+    expect(row(a, 'portfolio_snapshots', snapshot.id)).toMatchObject({ is_estimate: 0, market_value_jpy: actualOnA ? 100 : 200 });
+    expect(await engine.runSync(a, peer, direct())).toMatchObject({ received: 0, sent: 0 });
+  });
+
+  it('資産記録の同種同士は更新日時とデバイスIDのLWWで収束し、不正IDは拒否する', async () => {
+    const snapshot = { id: '2026-10-22|account', snapshot_date: '2026-10-22', portfolio_id: 'account',
+      market_value_jpy: 100, cost_basis_jpy: 80, cash_jpy: 0, usd_jpy: 150, is_estimate: 0 };
+    put(a, 'portfolio_snapshots', snapshot);
+    put(b, 'portfolio_snapshots', { ...snapshot, market_value_jpy: 150, updated_at: latest });
+    await engine.runSync(a, peer, direct());
+    expect(row(a, 'portfolio_snapshots', snapshot.id)?.market_value_jpy).toBe(150);
+    expect(sync.collectChanges(a, null)).toEqual(sync.collectChanges(b, null));
+    a.prepare('UPDATE portfolio_snapshots SET market_value_jpy = 180, updated_at = ?, updated_by = ?').run(latest, 'zzz');
+    b.prepare('UPDATE portfolio_snapshots SET updated_by = ?').run('aaa');
+    await engine.runSync(a, peer, direct());
+    expect(row(b, 'portfolio_snapshots', snapshot.id)?.market_value_jpy).toBe(180);
+    const changes = sync.collectChanges(a, null);
+    changes.portfolio_snapshots[0].id = 'wrong';
+    expect(() => sync.applyChanges(b, changes, { lastSyncedAt: null })).toThrow('ID・値');
+  });
+
   it('トップピックの追加・並べ替え・編集・外す・再選定・削除を2台に反映する', async () => {
     put(a, 'top_picks', { id: 'pick-one', symbol: 'NVDA', market: 'US', rank: 1, picked_at: '2026-10-01', picked_price: 100, benchmark_at_pick: 5000 });
     put(a, 'top_picks', { id: 'pick-two', symbol: 'AMD', market: 'US', rank: 2, picked_at: '2026-10-01', picked_price: 80 });

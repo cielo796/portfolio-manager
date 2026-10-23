@@ -16,3 +16,4 @@ export { purgeDeletedRows } from './maintenance';
 export { getDb, openDatabase } from './connection';
 export { listMemos, getMemoById, createMemo, updateMemoById, deleteMemoById } from './memos';
 export { listTopPicks, getTopPick, createTopPick, updateTopPick, deleteTopPick, removeTopPick, reorderTopPicks } from './top-picks';
+export { listSnapshots, recordCurrentSnapshots, upsertSnapshot, generateEstimateSnapshots } from './snapshots';

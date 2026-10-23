@@ -20,7 +20,19 @@ const MIGRATIONS: Array<{
   { version: 7, name: 'transaction-ledger', up: addTransactionLedger },
   { version: 8, name: 'stock-memos', up: createStockMemos },
   { version: 9, name: 'top-picks', up: createTopPicks },
+  { version: 10, name: 'portfolio-snapshots', up: createPortfolioSnapshots },
 ];
+
+function createPortfolioSnapshots(db: Database.Database) {
+  db.exec(`CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+    id TEXT PRIMARY KEY, snapshot_date TEXT NOT NULL, portfolio_id TEXT,
+    market_value_jpy REAL NOT NULL, cost_basis_jpy REAL NOT NULL, cash_jpy REAL, usd_jpy REAL,
+    is_estimate INTEGER NOT NULL DEFAULT 0 CHECK (is_estimate IN (0, 1)),
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT, updated_by TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_updated_at ON portfolio_snapshots(updated_at);
+  CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_date ON portfolio_snapshots(snapshot_date);`);
+}
 
 function createTopPicks(db: Database.Database) {
   db.exec(`CREATE TABLE IF NOT EXISTS top_picks (
@@ -116,7 +128,7 @@ function createSyncSchema(db: Database.Database) {
   `);
   for (const table of SYNC_TABLES) {
     // 後続のマイグレーションで作るテーブルは、その版で同期列も作る
-    if (table === 'stock_memos' || table === 'memo_symbols' || table === 'top_picks') continue;
+    if (table === 'stock_memos' || table === 'memo_symbols' || table === 'top_picks' || table === 'portfolio_snapshots') continue;
     db.exec(`
       ALTER TABLE ${table} ADD COLUMN deleted_at TEXT;
       ALTER TABLE ${table} ADD COLUMN updated_by TEXT;

@@ -6,6 +6,7 @@ import { formatHoldingCell, type HoldingColumnId, type HoldingRow } from '@/comp
 import { marketAllocation } from './home-data';
 import { HomePanel, PanelEmpty, PanelError, PanelSkeleton } from './panel';
 import { detailHref } from '@/components/detail/data';
+import { HomeHistory } from './history-panel';
 
 const COLUMNS: Array<[HoldingColumnId, string]> = [
   ['symbol', 'コード'], ['name', '銘柄名'], ['price', '現在値'], ['changePercent', '前日比%'],
@@ -84,7 +85,7 @@ function AllocationBar({ label, items }: { label: string; items: Array<{ label: 
 }
 
 export function HomeAllocation({ sectors, summary, ...state }: PortfolioStateProps & { sectors: SectorAllocation[]; summary: PortfolioSummary }) {
-  return <HomePanel title="配分"><PortfolioState {...state}>
+  return <div className="min-w-0 space-y-1"><HomePanel title="配分"><PortfolioState {...state}>
     {summary.total_value_jpy > 0 ? <div className="space-y-3 p-2.5"><AllocationBar label="セクター別" items={sectors.filter((sector) => sector.value > 0)} /><AllocationBar label="市場別" items={marketAllocation(summary)} /></div> : <PanelEmpty>配分を表示する資産がありません。</PanelEmpty>}
-  </PortfolioState></HomePanel>;
+  </PortfolioState></HomePanel>{!state.loading && !state.error && <HomeHistory revision={summary.total_value_jpy} />}</div>;
 }
