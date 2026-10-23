@@ -1,9 +1,13 @@
+'use client';
+
 import Link from 'next/link';
-import type { ReactNode } from 'react';
-import type { PortfolioSummary, SectorAllocation } from '@/types';
-import { formatCurrency, formatNumber, formatPercent, getProfitLossColor } from '@/lib/utils';
+import { useMemo, useSyncExternalStore, type ReactNode } from 'react';
+import type { HoldingWithPrice, PortfolioSummary, SectorAllocation } from '@/types';
+import { formatCurrency, formatPercent, getProfitLossColor } from '@/lib/utils';
 import { formatHoldingCell, type HoldingColumnId, type HoldingRow } from '@/components/holdings/columns';
-import { marketAllocation } from './home-data';
+import { portfolioAllocation } from './home-data';
+import { AllocationDonut } from '@/components/charts/allocation-donut';
+import { AllocationTabs, type AllocationView } from '@/components/charts/allocation-tabs';
 import { HomePanel, PanelEmpty, PanelError, PanelSkeleton } from './panel';
 import { detailHref } from '@/components/detail/data';
 import { HomeHistory } from './history-panel';
@@ -72,20 +76,47 @@ export function HomeMovers({ rows, ...state }: PortfolioStateProps & { rows: Hol
   </HomePanel>;
 }
 
-function AllocationBar({ label, items }: { label: string; items: Array<{ label: string; percent: number; color: string }> }) {
-  return <div className="space-y-2">
-    <h3 className="pm-muted text-[11px]">{label}</h3>
-    <div className="flex h-2.5 overflow-hidden rounded-sm bg-[var(--pm-heading)]" role="img" aria-label={`${label} ${items.map((item) => `${item.label} ${formatNumber(item.percent, 1)}%`).join('、')}`}>
-      {items.map((item) => <span key={item.label} title={`${item.label} ${formatNumber(item.percent, 1)}%`} style={{ width: `${item.percent}%`, background: item.color }} />)}
-    </div>
-    <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
-      {items.map((item) => <li key={item.label} className="flex min-w-0 items-center gap-1.5"><span className="size-2 shrink-0 rounded-sm" style={{ background: item.color }} /><span className="min-w-0 flex-1 truncate" title={item.label}>{item.label}</span><span className="num">{formatNumber(item.percent, 1)}%</span></li>)}
-    </ul>
-  </div>;
+const ALLOCATION_VIEW_KEY = 'pm.home.allocationView';
+const ALLOCATION_VIEW_EVENT = 'pm-home-allocation-view';
+let allocationViewMemory: AllocationView | null = null;
+
+function readAllocationView(): AllocationView {
+  if (allocationViewMemory !== null) return allocationViewMemory;
+  try {
+    const value = window.localStorage.getItem(ALLOCATION_VIEW_KEY);
+    return value === 'sector' || value === 'market' ? value : 'holding';
+  } catch { return 'holding'; }
 }
 
-export function HomeAllocation({ sectors, summary, ...state }: PortfolioStateProps & { sectors: SectorAllocation[]; summary: PortfolioSummary }) {
-  return <div className="min-w-0 space-y-1"><HomePanel title="配分"><PortfolioState {...state}>
-    {summary.total_value_jpy > 0 ? <div className="space-y-3 p-2.5"><AllocationBar label="セクター別" items={sectors.filter((sector) => sector.value > 0)} /><AllocationBar label="市場別" items={marketAllocation(summary)} /></div> : <PanelEmpty>配分を表示する資産がありません。</PanelEmpty>}
-  </PortfolioState></HomePanel>{!state.loading && !state.error && <HomeHistory revision={summary.total_value_jpy} />}</div>;
+function subscribeAllocationView(callback: () => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === ALLOCATION_VIEW_KEY || event.key === null) { allocationViewMemory = null; callback(); }
+  };
+  window.addEventListener('storage', onStorage);
+  window.addEventListener(ALLOCATION_VIEW_EVENT, callback);
+  return () => {
+    window.removeEventListener('storage', onStorage);
+    window.removeEventListener(ALLOCATION_VIEW_EVENT, callback);
+  };
+}
+
+export function HomeAllocation({ summary, holdings, usdJpy, loading, error, retry }: PortfolioStateProps & {
+  sectors?: SectorAllocation[];
+  summary: PortfolioSummary;
+  holdings: HoldingWithPrice[];
+  usdJpy: number;
+}) {
+  const view = useSyncExternalStore(subscribeAllocationView, readAllocationView, () => 'holding' as const);
+  const data = useMemo(() => portfolioAllocation(holdings, usdJpy), [holdings, usdJpy]);
+  const setView = (next: AllocationView) => {
+    allocationViewMemory = next;
+    try { window.localStorage.setItem(ALLOCATION_VIEW_KEY, next); } catch { /* 保存できなくても切替は有効にする。 */ }
+    window.dispatchEvent(new Event(ALLOCATION_VIEW_EVENT));
+  };
+  const items = view === 'holding' ? data.holdingItems : view === 'sector' ? data.sectorItems : data.marketItems;
+  return <div className="min-w-0 space-y-1"><HomePanel title="配分"><PortfolioState loading={loading} error={error} retry={retry}>
+    <div className="p-2"><AllocationTabs view={view} onChange={setView} market>
+      <AllocationDonut items={items} holdingCount={data.holdingCount} missingCount={data.missingCount} label={view === 'holding' ? '銘柄別配分' : view === 'sector' ? 'セクター別配分' : '市場別配分'} />
+    </AllocationTabs></div>
+  </PortfolioState></HomePanel>{!loading && !error && <HomeHistory revision={summary.total_value_jpy} />}</div>;
 }

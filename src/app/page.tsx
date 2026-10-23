@@ -32,7 +32,7 @@ export default function HomePage() {
     </div>
     <div className="grid min-w-0 grid-cols-1 gap-1 min-[600px]:grid-cols-2 min-[900px]:grid-cols-4">
       <HomeMovers rows={rows} {...state} />
-      <HomeAllocation sectors={sectorAllocation} summary={summary} {...state} />
+      <HomeAllocation sectors={sectorAllocation} summary={summary} holdings={holdings} usdJpy={exchangeRate.rate} {...state} />
       {isLoading || loadError ? <HomePanel title="決算予定（今後3週間）">{isLoading ? <PanelSkeleton /> : <PanelError retry={state.retry} />}</HomePanel> : <HomeEarnings holdings={holdings} />}
       <HomeNews />
     </div>

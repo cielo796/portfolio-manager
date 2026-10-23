@@ -1,5 +1,7 @@
 import type { FundamentalMetrics, HoldingWithPrice, PortfolioSummary, SparklineItem } from '@/types';
 import { SECTOR_CHART_COLORS } from '@/lib/sectors';
+import { computeHoldingAllocation, computeSectorAllocation, computeSummary } from '@/lib/portfolio-calc';
+import { ALLOCATION_PALETTE, ALLOCATION_SECTOR_COLORS, CASH_ALLOCATION_COLOR, allocationColor, type AllocationItem } from '@/components/charts/allocation-data';
 
 export const HOME_MARKETS = [
   { key: '^N225', symbol: '^N225', market: 'INDEX', name: '日経225' },
@@ -42,6 +44,34 @@ export function marketAllocation(summary: PortfolioSummary) {
     { label: 'FX', value: summary.fx_value_jpy, color: SECTOR_CHART_COLORS.fx },
     { label: '現金', value: summary.cash_value_jpy, color: SECTOR_CHART_COLORS.cash },
   ].filter((item) => item.value > 0).map((item) => ({ ...item, percent: summary.total_value_jpy > 0 ? item.value / summary.total_value_jpy * 100 : 0 }));
+}
+
+export function portfolioAllocation(holdings: HoldingWithPrice[], usdJpy: number) {
+  const priced = holdings.filter((holding) => holding.price_status !== 'missing');
+  const summary = computeSummary(priced, usdJpy);
+  const total = summary.total_value_jpy;
+  const holdingItems: AllocationItem[] = computeHoldingAllocation(priced, total).map((item) => ({
+    key: `${item.symbol}|${item.market}`,
+    label: item.symbol === 'CASH' ? `現金（${item.market === 'US' ? 'USD' : 'JPY'}）`
+      : item.name && item.name !== item.symbol ? `${item.symbol} ${item.name}` : item.symbol,
+    value: item.value,
+    percent: item.percent,
+    color: item.symbol === 'CASH' ? CASH_ALLOCATION_COLOR : allocationColor(`${item.symbol}|${item.market}`),
+  }));
+  const sectorItems: AllocationItem[] = computeSectorAllocation(priced, total).map((item) => ({
+    ...item, key: item.sector,
+    color: item.sector === 'cash' ? CASH_ALLOCATION_COLOR : item.sector === 'fx' ? ALLOCATION_PALETTE[5] : ALLOCATION_SECTOR_COLORS[item.sector],
+  }));
+  const marketColors: Record<string, string> = { 米国株: ALLOCATION_PALETTE[0], 日本株: ALLOCATION_PALETTE[2], FX: ALLOCATION_PALETTE[5], 現金: CASH_ALLOCATION_COLOR };
+  const marketItems: AllocationItem[] = marketAllocation(summary).map((item) => ({
+    ...item, key: item.label, color: marketColors[item.label],
+  }));
+  return {
+    holdingItems, sectorItems, marketItems, total,
+    holdingCount: new Set(priced.filter((holding) => holding.symbol !== 'CASH' && (holding.current_value_jpy ?? 0) > 0)
+      .map((holding) => `${holding.symbol}|${holding.market}`)).size,
+    missingCount: holdings.length - priced.length,
+  };
 }
 
 export function upcomingEarnings(holdings: HoldingWithPrice[], metrics: Record<string, FundamentalMetrics>, today: string) {

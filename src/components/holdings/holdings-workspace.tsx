@@ -11,6 +11,7 @@ import { formatCurrency, formatNumber, formatPercent, getProfitLossColor } from 
 import { createHoldingsCsv, holdingsCsvFilename } from './csv';
 import { HOLDING_COLUMNS, formatHoldingCell, holdingMarket, type HoldingColumnId, type HoldingRow } from './columns';
 import { HoldingDetailPane } from './detail-pane';
+import { HoldingsAllocationPopover } from './allocation-popover';
 
 type Grouping = 'market' | 'sector' | 'account' | 'none';
 
@@ -125,6 +126,7 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
         {([['market', '市場'], ['sector', 'セクター'], ['account', '口座'], ['none', 'なし']] as const).map(([key, label]) => <button type="button" key={key} aria-pressed={grouping === key} onClick={() => setGrouping(key)} className={`pm-button rounded-none first:rounded-l last:rounded-r ${grouping === key ? '!border-[#6b5226] !bg-[var(--pm-active-bg)] !text-[var(--pm-active-text)]' : ''}`}>{label}</button>)}
       </div>
       <input type="search" aria-label="保有銘柄を絞り込み" placeholder="コード・銘柄名・メモで絞り込み" value={filter} onChange={(event) => setFilter(event.target.value)} className="h-7 min-w-20 flex-1 rounded border border-[var(--pm-input-border)] bg-[var(--pm-bg)] px-2" />
+      <HoldingsAllocationPopover holdings={filtered.map((row) => row.holding)} usdJpy={usdJpy} />
       <details className="relative shrink-0" onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.open = false; }}>
         <summary className="pm-button list-none">列 {visibleColumns.length}/18</summary>
         <div className="absolute right-0 top-8 z-30 grid max-h-[65vh] w-56 gap-1 overflow-auto rounded border border-[var(--pm-border)] bg-[var(--pm-panel)] p-3 shadow-xl">
