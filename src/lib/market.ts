@@ -1,20 +1,9 @@
 import 'server-only';
 
-import type { ChartMarket, MarketItem, MarketSnapshot } from '@/types';
+import type { ChartMarket, MarketGroup, MarketItem, MarketSnapshot } from '@/types';
+import { MARKET_TARGETS } from '@/components/market/symbols';
 
-export const MARKET_SYMBOLS = [
-  { key: '^N225', name: '日経225' },
-  { key: '^DJI', name: 'NYダウ' },
-  { key: '^GSPC', name: 'S&P500' },
-  { key: '^IXIC', name: 'NASDAQ' },
-  { key: '^SOX', name: 'SOX' },
-  { key: '^VIX', name: 'VIX' },
-  { key: '^TNX', name: '米10年債' },
-  { key: 'USDJPY=X', name: 'USD/JPY' },
-  { key: 'EURJPY=X', name: 'EUR/JPY' },
-  { key: 'CL=F', name: 'WTI' },
-  { key: 'GC=F', name: '金' },
-] as const;
+export const MARKET_SYMBOLS = MARKET_TARGETS;
 
 export type YahooChart = {
   chart?: {
@@ -76,7 +65,7 @@ export async function fetchYahooChart(symbol: string, params: Record<string, str
 const positive = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0;
 
-export function parseMarketChart(data: YahooChart, key: string, name: string, now: string): MarketItem | null {
+export function parseMarketChart(data: YahooChart, key: string, name: string, now: string, group: MarketGroup = 'index'): MarketItem | null {
   const result = data.chart?.result?.[0];
   if (!result || data.chart?.error) return null;
   const value = result.meta?.regularMarketPrice;
@@ -88,7 +77,7 @@ export function parseMarketChart(data: YahooChart, key: string, name: string, no
   const timestamp = result.meta?.regularMarketTime;
   const date = positive(timestamp) ? new Date(timestamp * 1000) : null;
   return {
-    key, name, value, change, changePercent: change / previous * 100,
+    key, name, group, value, change, changePercent: change / previous * 100,
     updatedAt: date && Number.isFinite(date.getTime()) ? date.toISOString() : now,
   };
 }
@@ -104,9 +93,9 @@ export function createMarketReader() {
     if (pending) return pending;
     pending = (async () => {
       const failed: string[] = [];
-      const values = await Promise.all(MARKET_SYMBOLS.map(async ({ key, name }) => {
+      const values = await Promise.all(MARKET_SYMBOLS.map(async ({ key, name, group }) => {
         try {
-          const item = parseMarketChart(await fetchYahooChart(key, { range: '5d' }), key, name, new Date().toISOString());
+          const item = parseMarketChart(await fetchYahooChart(key, { range: '5d' }), key, name, new Date().toISOString(), group);
           if (!item) throw new Error('invalid_market_chart');
           lastValues.set(key, item);
           return item;

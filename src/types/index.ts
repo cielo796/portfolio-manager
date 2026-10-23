@@ -275,9 +275,27 @@ export interface DisplaySettings {
   density: 'compact' | 'standard';
 }
 
+export type MarketGroup = 'index' | 'fx' | 'rate' | 'commodity' | 'sector';
+export type SectorPeriod = 'day' | 'week' | 'month' | 'ytd';
+
+export interface MarketTarget {
+  key: string;
+  name: string;
+  group: MarketGroup;
+}
+
+export interface MarketHeatTile extends DetailSymbol {
+  key: string;
+  sector: string;
+  held: boolean;
+  value?: number;
+  changePercent?: number;
+}
+
 export interface MarketItem {
   key: string;
   name: string;
+  group: MarketGroup;
   value: number;
   change: number;
   changePercent: number;
