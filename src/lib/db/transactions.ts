@@ -14,13 +14,28 @@ export function listTransactions(): Transaction[] {
 }
 
 type TransactionInput = Pick<Transaction, 'portfolio_id' | 'symbol' | 'market' | 'type' | 'shares' | 'price' | 'transaction_date'> &
-  Partial<Pick<Transaction, 'fees' | 'memo' | 'fx_rate'>>;
+  Partial<Pick<Transaction, 'fees' | 'memo' | 'fx_rate'>> & { name?: string };
 type LedgerHolding = Holding & { ledger_opening_shares: number | null; ledger_opening_cost: number | null };
+
+function findSymbolProfile(symbol: string, market: string): { name: string | null; sector: string | null } {
+  const db = getDb();
+  const watch = db.prepare(`SELECT name, sector FROM watchlist_items WHERE symbol = ? AND market = ? AND deleted_at IS NULL
+    ORDER BY (NULLIF(TRIM(name), '') IS NULL) ASC, created_at DESC LIMIT 1`).get(symbol, market) as
+    { name: string | null; sector: string | null } | undefined;
+  const holding = db.prepare(`SELECT name, sector FROM holdings WHERE symbol = ? AND market = ? AND deleted_at IS NULL
+    ORDER BY (NULLIF(TRIM(name), '') IS NULL) ASC, created_at DESC LIMIT 1`).get(symbol, market) as
+    { name: string | null; sector: string | null } | undefined;
+  return {
+    name: watch?.name?.trim() || holding?.name?.trim() || null,
+    sector: watch?.sector?.trim() || null,
+  };
+}
 
 export function validateTransaction(input: TransactionInput): TransactionInput {
   if (!input || typeof input.portfolio_id !== 'string' || !input.portfolio_id.trim() ||
     typeof input.symbol !== 'string' || !input.symbol.trim() || !['US', 'JP', 'FX'].includes(input.market) ||
     !['buy', 'sell', 'dividend'].includes(input.type)) throw new TradeLedgerError('必須項目が不足しています。');
+  if (input.name != null && typeof input.name !== 'string') throw new TradeLedgerError('銘柄名が不正です。');
   const symbol = input.symbol.trim().toUpperCase();
   if (input.market === 'FX' && !/^[A-Z]{3}(JPY|USD)$/.test(symbol)) {
     throw new TradeLedgerError('FX通貨ペアはJPY/USDクォートのみ対応しています。');
@@ -43,7 +58,7 @@ export function validateTransaction(input: TransactionInput): TransactionInput {
   return { ...input, symbol };
 }
 
-function attachHolding(entry: Transaction): string | null {
+function attachHolding(entry: Transaction, name?: string): string | null {
   if (entry.symbol === 'CASH') return null;
   const db = getDb();
   const matches = db.prepare(`SELECT * FROM holdings WHERE portfolio_id = ? AND symbol = ? AND market = ?
@@ -55,8 +70,10 @@ function attachHolding(entry: Transaction): string | null {
   if (!holding) {
     if (entry.type === 'dividend') return null;
     if (entry.type === 'sell') throw new TradeLedgerError('売却する保有がありません。');
+    const profile = findSymbolProfile(entry.symbol, entry.market);
     holding = { ...createHolding({ portfolio_id: entry.portfolio_id, symbol: entry.symbol, market: entry.market,
-      shares: 1, avg_cost: 0 }), ledger_opening_shares: 0, ledger_opening_cost: 0 };
+      shares: 1, avg_cost: 0, name: name?.trim() || profile.name || undefined, sector: profile.sector ?? undefined }),
+      ledger_opening_shares: 0, ledger_opening_cost: 0 };
     db.prepare('UPDATE holdings SET ledger_opening_shares = 0, ledger_opening_cost = 0 WHERE id = ?').run(holding.id);
   } else if (holding.ledger_opening_shares === null) {
     db.prepare('UPDATE holdings SET ledger_opening_shares = shares, ledger_opening_cost = avg_cost WHERE id = ?').run(holding.id);
@@ -101,13 +118,13 @@ function prepareFullReplay(entry: Transaction, now: string): string | null {
 export function createTransaction(input: TransactionInput): Transaction {
   const db = getDb();
   return db.transaction(() => {
-    const valid = validateTransaction(input);
+    const { name, ...valid } = validateTransaction(input);
     const latest = db.prepare('SELECT MAX(created_at) AS value FROM transactions').get() as { value: string | null };
     const now = new Date(Math.max(Date.now(), Date.parse(latest.value ?? '') + 1 || 0)).toISOString();
     const entry: Transaction = { ...valid, id: crypto.randomUUID(), fees: valid.fees ?? 0,
       total_amount: valid.shares * valid.price, memo: valid.memo?.trim(), fx_rate: valid.fx_rate ?? null,
       realized_pl: null, holding_id: null, created_at: now, updated_at: now, updated_by: getDeviceId() };
-    entry.holding_id = attachHolding(entry);
+    entry.holding_id = attachHolding(entry, name);
     db.prepare(`INSERT INTO transactions (id, portfolio_id, symbol, market, type, shares, price, total_amount, fees,
       transaction_date, memo, created_at, updated_at, updated_by, realized_pl, fx_rate, holding_id)
       VALUES (@id, @portfolio_id, @symbol, @market, @type, @shares, @price, @total_amount, @fees,

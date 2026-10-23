@@ -5,7 +5,7 @@ import type { DetailSymbol, Holding, Market, Transaction, TransactionType } from
 import { transactionLabels } from '@/lib/trade-ledger';
 
 export type RecordInput = Pick<Transaction, 'portfolio_id' | 'symbol' | 'market' | 'type' | 'shares' | 'price' | 'fees' | 'transaction_date'> &
-  Partial<Pick<Transaction, 'memo' | 'fx_rate'>>;
+  Partial<Pick<Transaction, 'memo' | 'fx_rate'>> & { name?: string };
 
 const inputClass = 'h-[26px] w-full rounded border border-[var(--pm-input-border)] bg-[var(--pm-bg)] px-2 text-xs disabled:opacity-60';
 
@@ -23,9 +23,22 @@ export function RecordForm({ portfolios, holdings = [], candidates = [], current
     type: 'buy', shares: 0, price: 0, fees: 0, transaction_date: new Date().toLocaleDateString('sv-SE'),
     fx_rate: currentRate ?? null, memo: '', ...initial });
   const [query, setQuery] = useState(initial?.symbol ?? '');
+  const [suggestionsOpen, setSuggestionsOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const patch = (values: Partial<RecordInput>) => setForm((previous) => ({ ...previous, ...values }));
+  const selectSymbol = (item: DetailSymbol) => {
+    setQuery(item.symbol);
+    setSuggestionsOpen(false);
+    const values: Partial<RecordInput> = { symbol: item.symbol, market: item.market, name: item.name };
+    if (!editing) {
+      const portfolioIds = Array.from(new Set(holdings.filter((holding) => holding.symbol !== 'CASH' &&
+        holding.symbol === item.symbol && holding.market === item.market).map((holding) => holding.portfolio_id)));
+      if (portfolioIds.length === 1) values.portfolio_id = portfolioIds[0];
+      else if (portfolioIds.length > 1 && !portfolioIds.includes(form.portfolio_id)) values.portfolio_id = portfolioIds[0];
+    }
+    patch(values);
+  };
   const choices = Array.from(new Map([...holdings, ...candidates].filter((item) => item.symbol !== 'CASH')
     .map((item) => [`${item.symbol}|${item.market}`, item])).values());
   const matches = choices.filter((item) => `${item.symbol} ${item.name ?? ''}`.toLowerCase().includes(query.toLowerCase())).slice(0, 12);
@@ -46,12 +59,10 @@ export function RecordForm({ portfolios, holdings = [], candidates = [], current
         <button key={type} type="button" aria-pressed={form.type === type} className={`pm-button flex-1 ${form.type === type ? '!border-[#6b5226] !bg-[#2a2214] !text-[#f5b955]' : ''}`} onClick={() => patch({ type })}>{transactionLabels[type]}</button>)}</div>
       <label className="flex flex-col gap-1 pm-muted">日付<input required type="date" className={inputClass} value={form.transaction_date} onChange={(event) => patch({ transaction_date: event.target.value })} /></label>
       <label className="flex flex-col gap-1 pm-muted">銘柄（コード・銘柄名で検索）<input required disabled={editing} className={inputClass} placeholder="コードまたは銘柄名" value={query} onChange={(event) => {
-        setQuery(event.target.value); patch({ symbol: event.target.value.toUpperCase() });
+        setQuery(event.target.value); setSuggestionsOpen(true); patch({ symbol: event.target.value.toUpperCase(), name: undefined });
       }} /></label>
-      {!editing && query && matches.length > 0 && <div aria-label="銘柄候補" className="max-h-32 overflow-auto rounded border border-[var(--pm-border)]">{matches.map((item) =>
-        <button key={`${item.symbol}|${item.market}`} type="button" className="block w-full truncate px-2 py-1 text-left hover:bg-[#1a2638]" onClick={() => {
-          setQuery(item.symbol); patch({ symbol: item.symbol, market: item.market });
-        }}>{item.symbol} · {item.name ?? item.market}（{item.market}）</button>)}</div>}
+      {!editing && suggestionsOpen && query && matches.length > 0 && <div aria-label="銘柄候補" className="max-h-32 overflow-auto rounded border border-[var(--pm-border)]">{matches.map((item) =>
+        <button key={`${item.symbol}|${item.market}`} type="button" className="block w-full truncate px-2 py-1 text-left hover:bg-[#1a2638]" onClick={() => selectSymbol(item)}>{item.symbol} · {item.name ?? item.market}（{item.market}）</button>)}</div>}
       <label className="flex flex-col gap-1 pm-muted">市場<select disabled={editing} className={inputClass} value={form.market} onChange={(event) => patch({ market: event.target.value as Market })}>
         <option value="US">米国株（USD）</option><option value="JP">日本株（JPY）</option><option value="FX">FX（JPY / USDクォート）</option>
       </select></label>

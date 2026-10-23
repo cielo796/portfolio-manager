@@ -33,7 +33,7 @@ describe('一時DBでの記録と保有の連動', () => {
   });
   beforeEach(() => {
     expect(db.name).toBe(dbPath);
-    db.exec(`DELETE FROM transactions; DELETE FROM holdings; DELETE FROM portfolios;
+    db.exec(`DELETE FROM transactions; DELETE FROM holdings; DELETE FROM portfolios; DELETE FROM watchlist_items;
       INSERT INTO portfolios (id, name, broker, created_at, updated_at) VALUES ('account', '口座', '', '2026-01-01', '2026-01-01');
       INSERT INTO portfolios (id, name, broker, created_at, updated_at) VALUES ('other', '別口座', '', '2026-01-01', '2026-01-01');`);
   });
@@ -70,6 +70,16 @@ describe('一時DBでの記録と保有の連動', () => {
     expect(api.listHoldings()[0]).toMatchObject({ id: holding.id, shares: 30, avg_cost: 87, name: '銘柄名' });
     api.deleteTransactionById(buy.id);
     expect(api.listHoldings()[0]).toMatchObject({ shares: 20, avg_cost: 80 });
+  });
+  it('新規保有に name と sector が入り、既存保有は上書きしない', () => {
+    db.prepare(`INSERT INTO watchlist_items (id, symbol, name, market, sector, created_at, updated_at)
+      VALUES ('watch-test', 'TEST', '登録銘柄名', 'US', 'technology', '2026-01-01', '2026-01-01')`).run();
+    api.createTransaction(purchase);
+    expect(api.listHoldings()[0]).toMatchObject({ name: '登録銘柄名', sector: 'technology' });
+    api.createTransaction({ ...purchase, portfolio_id: 'other', name: '入力した銘柄名' });
+    expect(api.listHoldings().find((holding) => holding.portfolio_id === 'other')).toMatchObject({ name: '入力した銘柄名', sector: 'technology' });
+    api.createTransaction({ ...purchase, name: '別の銘柄名' });
+    expect(api.listHoldings().find((holding) => holding.portfolio_id === 'account')).toMatchObject({ name: '登録銘柄名', sector: 'technology' });
   });
   it('超過売却、過去日への編集、購入削除を原子的に拒否する', () => {
     const buy = api.createTransaction(purchase);
