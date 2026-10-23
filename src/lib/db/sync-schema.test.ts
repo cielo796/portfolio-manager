@@ -73,6 +73,16 @@ describe('同期スキーマと論理削除', () => {
     try {
       // 現行スキーマから同期列を除き、直前のバージョンを再現する
       runMigrations(legacy);
+      // v7で追加したトリガー・索引・列を先に取り除く
+      legacy.exec(`
+        DROP TRIGGER IF EXISTS keep_ledger_holding;
+        DROP INDEX IF EXISTS idx_transactions_holding;
+        ALTER TABLE transactions DROP COLUMN realized_pl;
+        ALTER TABLE transactions DROP COLUMN fx_rate;
+        ALTER TABLE transactions DROP COLUMN holding_id;
+        ALTER TABLE holdings DROP COLUMN ledger_opening_shares;
+        ALTER TABLE holdings DROP COLUMN ledger_opening_cost;
+      `);
       for (const table of SYNC_TABLES) {
         legacy.exec(`
           DROP INDEX idx_${table}_updated_at;
@@ -95,6 +105,8 @@ describe('同期スキーマと論理削除', () => {
       `);
       runMigrations(legacy);
       expect(legacy.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(3);
+      expect(legacy.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name = 'keep_ledger_holding'").get())
+        .toEqual({ name: 'keep_ledger_holding' });
       for (const table of SYNC_TABLES) {
         const rows = legacy.prepare(`SELECT deleted_at, updated_by FROM ${table}`).all();
         expect(rows).toEqual([{ deleted_at: null, updated_by: null }]);
