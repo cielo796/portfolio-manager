@@ -97,6 +97,62 @@ describe('LAN同期エンジン・API', () => {
     expect(a.prepare('SELECT COUNT(*) AS n FROM holdings').get()).toEqual({ n: 0 });
   });
 
+  it('トップピックの追加・並べ替え・編集・外す・再選定・削除を2台に反映する', async () => {
+    put(a, 'top_picks', { id: 'pick-one', symbol: 'NVDA', market: 'US', rank: 1, picked_at: '2026-10-01', picked_price: 100, benchmark_at_pick: 5000 });
+    put(a, 'top_picks', { id: 'pick-two', symbol: 'AMD', market: 'US', rank: 2, picked_at: '2026-10-01', picked_price: 80 });
+    await engine.runSync(a, peer, direct());
+    expect(row(b, 'top_picks', 'pick-one')).toEqual(row(a, 'top_picks', 'pick-one'));
+    vi.setSystemTime('2026-10-22T00:04:00.000Z');
+    const reorderedAt = new Date().toISOString();
+    b.prepare('UPDATE top_picks SET rank = 3 - rank, thesis = ?, updated_at = ?, updated_by = ?').run('Bで確認', reorderedAt, identity(b));
+    await engine.runSync(a, peer, direct());
+    expect(row(a, 'top_picks', 'pick-two')).toMatchObject({ rank: 1, thesis: 'Bで確認' });
+    expect(sync.collectChanges(a, null).top_picks).toEqual(sync.collectChanges(b, null).top_picks);
+    vi.setSystemTime('2026-10-22T00:05:00.000Z');
+    const removedAt = new Date().toISOString();
+    a.prepare('UPDATE top_picks SET removed_at = ?, removed_price = 130, benchmark_at_remove = 5500, updated_at = ?, updated_by = ? WHERE id = ?')
+      .run(removedAt, removedAt, identity(a), 'pick-one');
+    put(a, 'top_picks', { id: 'pick-again', symbol: 'NVDA', market: 'US', rank: 2, picked_at: '2026-10-22', picked_price: 130, updated_at: removedAt });
+    await engine.runSync(a, peer, direct());
+    expect(row(b, 'top_picks', 'pick-one')).toMatchObject({ removed_at: removedAt, removed_price: 130, benchmark_at_remove: 5500 });
+    expect(b.prepare("SELECT id FROM top_picks WHERE symbol = 'NVDA'").all()).toHaveLength(2);
+    vi.setSystemTime('2026-10-22T00:06:00.000Z');
+    b.prepare('UPDATE top_picks SET deleted_at = ?, updated_at = ?, updated_by = ? WHERE id = ?').run(new Date().toISOString(), new Date().toISOString(), identity(b), 'pick-again');
+    await engine.runSync(a, peer, direct());
+    expect(row(a, 'top_picks', 'pick-again')?.deleted_at).toBe(new Date().toISOString());
+    expect(sync.collectChanges(a, null).top_picks).toEqual(sync.collectChanges(b, null).top_picks);
+  });
+
+  it('トップピックは両PCで順位が重複しても行を統合せず、同時編集は後勝ちになる', async () => {
+    put(a, 'top_picks', { id: 'a-pick', symbol: 'NVDA', market: 'US', rank: 1, picked_at: '2026-10-01', picked_price: 100 });
+    put(b, 'top_picks', { id: 'b-pick', symbol: 'NVDA', market: 'US', rank: 1, picked_at: '2026-10-01', picked_price: 100 });
+    await engine.runSync(a, peer, direct());
+    expect(a.prepare('SELECT rank FROM top_picks').all()).toEqual([{ rank: 1 }, { rank: 1 }]);
+    vi.setSystemTime('2026-10-22T00:06:00.000Z');
+    a.prepare('UPDATE top_picks SET thesis = ?, updated_at = ?, updated_by = ? WHERE id = ?').run('A編集', '2026-10-22T00:04:00.000Z', identity(a), 'a-pick');
+    b.prepare('UPDATE top_picks SET thesis = ?, updated_at = ?, updated_by = ? WHERE id = ?').run('B編集', '2026-10-22T00:05:00.000Z', identity(b), 'a-pick');
+    const result = await engine.runSync(a, peer, direct());
+    expect(result.conflicts).toBe(1);
+    expect(row(a, 'top_picks', 'a-pick')?.thesis).toBe('B編集');
+    expect(sync.collectChanges(a, null).top_picks).toEqual(sync.collectChanges(b, null).top_picks);
+  });
+
+  it('両PCの独立追加が同期後に10件を超える場合は全体を取り消し、両PCの行を保つ', () => {
+    for (let i = 0; i < 6; i++) {
+      put(a, 'top_picks', { id: `a-${i}`, symbol: 'NVDA', market: 'US', rank: i + 1, picked_at: '2026-10-01', picked_price: 100 });
+      put(b, 'top_picks', { id: `b-${i}`, symbol: 'AMD', market: 'US', rank: i + 1, picked_at: '2026-10-01', picked_price: 80 });
+    }
+    idea(b);
+    expect(() => sync.applyChanges(a, sync.collectChanges(b, null), { lastSyncedAt: null })).toThrow('10件');
+    expect(sync.collectChanges(a, null).top_picks).toHaveLength(6);
+    expect(sync.collectChanges(b, null).top_picks).toHaveLength(6);
+    expect(row(a, 'trade_ideas', 'idea')).toBeUndefined();
+    b.prepare("UPDATE top_picks SET removed_at = ?, removed_price = 80 WHERE id IN ('b-0', 'b-1')").run(edited);
+    sync.applyChanges(a, sync.collectChanges(b, null), { lastSyncedAt: null });
+    expect(a.prepare('SELECT COUNT(*) AS n FROM top_picks WHERE removed_at IS NULL AND deleted_at IS NULL').get()).toEqual({ n: 10 });
+    expect(sync.collectChanges(a, null).top_picks).toHaveLength(12);
+  });
+
   it('全6テーブルを外部キー順に送信し、Bの編集をAへ反映する', async () => {
     put(a, 'portfolios', { id: 'account', name: '口座' });
     put(a, 'holdings', { id: 'holding', portfolio_id: 'account', symbol: 'AAPL', market: 'US', shares: 1, avg_cost: 100 });

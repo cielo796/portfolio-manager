@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { LatestMemos } from '@/components/memos/latest-memos';
+import { TopPickBadge, useTopPickRanks } from '@/components/top-picks/top-pick-badge';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { ChartData, DetailSymbol, FundamentalMetrics, Holding, NewsItem, StockPrice, Transaction, WatchlistItem, WatchlistKey } from '@/types';
@@ -57,6 +58,7 @@ export function DetailWorkspace() {
 }
 
 function DetailContent({ selected, holdings, watchlist, cachedPrice }: { selected: DetailSymbol; holdings: Holding[]; watchlist: WatchlistItem[]; cachedPrice?: StockPrice }) {
+  const topPicks = useTopPickRanks();
   const { symbol, market } = selected;
   const key = priceKey(symbol, market);
   const owned = useMemo(() => holdings.filter((item) => item.symbol === symbol && item.market === market), [holdings, symbol, market]);
@@ -88,6 +90,7 @@ function DetailContent({ selected, holdings, watchlist, cachedPrice }: { selecte
   const toggle = (field: 'ma5' | 'ma25' | 'ma75' | 'cost' | 'target' | 'trades', label: string, disabled = false) => <button type="button" aria-pressed={settings[field]} disabled={disabled} onClick={() => update({ [field]: !settings[field] })} className={`pm-button !h-6 !px-2 ${settings[field] ? activeButton : ''}`}>{label}</button>;
   return <div className="grid min-w-0 grid-cols-1 items-start gap-1 min-[1100px]:grid-cols-[minmax(0,1fr)_260px]">
     <section aria-labelledby="detail-title" className={panel}>
+      <TopPickBadge symbol={symbol} market={market} picks={topPicks} />
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-[var(--pm-border)] px-3 py-2">
         <div className="flex flex-wrap items-baseline gap-2"><span className="pm-muted">{symbol}</span><h1 id="detail-title" className="text-[15px] font-semibold">{name}</h1><span className="text-[11px] pm-muted">{getMarketLabel(market)}・{market === 'FX' ? '為替' : getSectorLabel(sector)}・{status}</span></div>
         <div className="flex items-baseline gap-2"><span className="text-[22px] font-semibold tabular-nums">{price ? moneyText(price.price, currency) : '価格未取得'}</span><span className={`tabular-nums ${price ? getProfitLossColor(price.change) : 'pm-muted'}`}>{price ? `${price.change > 0 ? '+' : ''}${numberText(price.change, 4)}（${percentText(price.change_percent)}）` : '—'}</span></div>

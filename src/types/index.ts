@@ -2,6 +2,53 @@ import type { SectorKey } from '@/lib/sectors';
 
 // 市場タイプ
 export type Market = 'US' | 'JP' | 'FX';
+export interface TopPick {
+  id: string;
+  symbol: string;
+  market: Market;
+  rank: number;
+  theme: string | null;
+  conviction: 'high' | 'medium' | 'low' | null;
+  horizon: 'short' | 'medium' | 'long' | null;
+  picked_at: string;
+  picked_price: number;
+  benchmark_at_pick: number | null;
+  target_price: number | null;
+  review_on: string | null;
+  thesis: string | null;
+  catalysts: string | null;
+  risks: string | null;
+  exit_rule: string | null;
+  removed_at: string | null;
+  removed_price: number | null;
+  benchmark_at_remove: number | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  updated_by: string | null;
+}
+export interface TopPickView extends TopPick {
+  name: string;
+  state: '保有中' | '登録' | '未登録';
+  current_price: number | null;
+  current_benchmark: number | null;
+  next_earnings_date: string | null;
+}
+export interface TopPickInput {
+  symbol: string;
+  market: Market;
+  theme?: string | null;
+  conviction?: TopPick['conviction'];
+  horizon?: TopPick['horizon'];
+  pickedAt?: string;
+  pickedPrice?: number;
+  targetPrice?: number | null;
+  reviewOn?: string | null;
+  thesis?: string | null;
+  catalysts?: string | null;
+  risks?: string | null;
+  exitRule?: string | null;
+}
 export type MemoTag = 'earnings' | 'idea' | 'trade' | 'news' | 'review';
 export interface MemoSymbol {
   symbol: string;
@@ -360,7 +407,7 @@ export interface ShellSyncLog {
 }
 
 // LAN同期ではDBの全列をそのまま交換する
-export type SyncTable = 'portfolios' | 'holdings' | 'transactions' | 'trade_ideas' | 'ticker_presets' | 'watchlist_items' | 'stock_memos' | 'memo_symbols';
+export type SyncTable = 'portfolios' | 'holdings' | 'transactions' | 'trade_ideas' | 'ticker_presets' | 'watchlist_items' | 'stock_memos' | 'memo_symbols' | 'top_picks';
 export type SyncValue = string | number | null;
 export interface SyncRow {
   [column: string]: SyncValue;

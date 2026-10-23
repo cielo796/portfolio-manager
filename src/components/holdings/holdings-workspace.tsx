@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { detailHref } from '@/components/detail/data';
+import { TopPickBadge, useTopPickRanks } from '@/components/top-picks/top-pick-badge';
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type Row, type SortingState } from '@tanstack/react-table';
 import { useColumnSettings } from '@/hooks/use-column-settings';
 import { computeHoldingSubtotal } from '@/lib/portfolio-calc';
@@ -33,6 +34,7 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
   const [dropId, setDropId] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const topPicks = useTopPickRanks();
   const { visibility, setVisibility, sizing, setSizing } = useColumnSettings();
   const filtered = useMemo(() => {
     const query = filter.trim().toLocaleLowerCase();
@@ -169,7 +171,7 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
                 const value = row.original.values[meta.id];
                 const content = formatHoldingCell(row.original, meta.id);
                 return <div key={cell.id} role="cell" title={content} className={`truncate px-2 ${'numeric' in meta ? 'text-right tabular-nums' : ''} ${content === '価格未取得' ? 'pm-muted !px-1 text-[10px]' : 'signed' in meta && typeof value === 'number' ? getProfitLossColor(value) : ''}`}>
-                  {meta.id === 'name' && row.original.holding.symbol !== 'CASH' ? <Link href={detailHref(row.original.holding)} className="block w-full truncate text-left text-[var(--pm-link)] hover:underline" onClick={(event) => event.stopPropagation()}>{content}</Link> : content}
+                  {meta.id === 'name' && row.original.holding.symbol !== 'CASH' ? <div className="flex items-center gap-1"><Link href={detailHref(row.original.holding)} className="min-w-0 flex-1 truncate text-left text-[var(--pm-link)] hover:underline" onClick={(event) => event.stopPropagation()}>{content}</Link><TopPickBadge symbol={row.original.holding.symbol} market={row.original.holding.market} picks={topPicks} /></div> : content}
                 </div>;
               })}
             </div>)}

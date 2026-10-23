@@ -4,10 +4,10 @@ import type Database from 'better-sqlite3';
 import type { SyncApplyResult, SyncChanges, SyncRow, SyncTable } from '@/types';
 import { SyncError, validTime } from './state';
 
-export const tables: SyncTable[] = ['portfolios', 'holdings', 'transactions', 'trade_ideas', 'ticker_presets', 'watchlist_items', 'stock_memos', 'memo_symbols'];
+export const tables: SyncTable[] = ['portfolios', 'holdings', 'transactions', 'trade_ideas', 'ticker_presets', 'watchlist_items', 'stock_memos', 'memo_symbols', 'top_picks'];
 
 export function emptyChanges(): SyncChanges {
-  return { portfolios: [], holdings: [], transactions: [], trade_ideas: [], ticker_presets: [], watchlist_items: [], stock_memos: [], memo_symbols: [] };
+  return { portfolios: [], holdings: [], transactions: [], trade_ideas: [], ticker_presets: [], watchlist_items: [], stock_memos: [], memo_symbols: [], top_picks: [] };
 }
 
 export function collectChanges(db: Database.Database, since: string | null, excludeDeviceId?: string): SyncChanges {
@@ -95,6 +95,8 @@ export function applyChanges(db: Database.Database, changes: SyncChanges, option
         if (remapped) result.canonicalChanges[table].push(winner);
       }
     }
+    const activePicks = db.prepare('SELECT COUNT(*) AS n FROM top_picks WHERE removed_at IS NULL AND deleted_at IS NULL').get() as { n: number };
+    if (activePicks.n > 10) throw new SyncError('同期後の現在のピックが10件を超えます。不要なピックを外して再同期してください。', 409);
     return result;
   })();
 }

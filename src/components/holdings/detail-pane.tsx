@@ -1,6 +1,7 @@
 'use client';
 
 import { LatestMemos } from '@/components/memos/latest-memos';
+import { TopPickBadge, useTopPickRanks } from '@/components/top-picks/top-pick-badge';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -23,6 +24,7 @@ export function HoldingDetailPane({ row, onEdit, onSaveMemo }: {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const topPicks = useTopPickRanks();
   if (!row) return <aside aria-label="選択中の銘柄" className="rounded border border-[var(--pm-border)] bg-[var(--pm-panel)] p-3 pm-muted">表示中の銘柄を選択してください。</aside>;
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -33,6 +35,7 @@ export function HoldingDetailPane({ row, onEdit, onSaveMemo }: {
     <aside aria-label="選択中の銘柄" className="flex min-w-0 flex-col rounded border border-[var(--pm-border)] bg-[var(--pm-panel)]">
       <div className="border-b border-[var(--pm-border)] px-3 py-2">
         <div className="flex flex-wrap items-baseline gap-2"><span className="pm-muted">{row.values.symbol}</span><strong className="text-sm">{row.values.name}</strong><span className="pm-muted">{row.values.market}</span></div>
+        <TopPickBadge symbol={row.holding.symbol} market={row.holding.market} picks={topPicks} />
         <div className="mt-1 flex flex-wrap items-baseline gap-2 tabular-nums"><strong className={`text-[22px] ${row.holding.price_status === 'missing' ? 'pm-muted' : ''}`}>{formatHoldingCell(row, 'price')}</strong><span className={getProfitLossColor(Number(row.values.change ?? 0))}>{formatHoldingCell(row, 'change')}（{formatHoldingCell(row, 'changePercent')}）</span></div>
       </div>
       <dl className="grid grid-cols-2 gap-x-3 gap-y-2 border-b border-[var(--pm-border)] px-3 py-2">

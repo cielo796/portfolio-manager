@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { Holding, MemoSymbolRow, Portfolio, StockMemo, TickerPreset, TradeIdea, Transaction, WatchlistItem, WatchlistKey } from '@/types';
+import { Holding, MemoSymbolRow, Portfolio, StockMemo, TickerPreset, TopPick, TradeIdea, Transaction, WatchlistItem, WatchlistKey } from '@/types';
 import { mockPortfolios } from '@/lib/mock-data';
 import { normalizeSectorKey, resolveHoldingSector, resolveSectorForSymbol } from '@/lib/sectors';
 import { getDb } from './connection';
@@ -13,6 +13,7 @@ import { listTransactions } from './transactions';
 import { listTradeIdeas } from './trade-ideas';
 import { listWatchlistItems } from './watchlist';
 import { listTickerPresets } from './ticker-presets';
+import { validateTopPickInput } from './top-picks';
 
 type PortfolioBackup = Pick<Portfolio, 'id' | 'name' | 'broker' | 'description' | 'created_at' | 'updated_at'>;
 type HoldingBackup = Pick<
@@ -76,6 +77,7 @@ export interface BackupData {
 export interface MemoBackupData extends BackupData {
   stockMemos?: MemoBackup[];
   memoSymbols?: SymbolBackup[];
+  topPicks?: Omit<TopPick, 'deleted_at' | 'updated_by'>[];
 }
 
 function backupRow<T extends { deleted_at?: string | null; updated_by?: string | null }>(row: T) {
@@ -87,6 +89,7 @@ function backupRow<T extends { deleted_at?: string | null; updated_by?: string |
 
 export function exportBackupData(): MemoBackupData {
   const db = getDb();
+  const topPicks = db.prepare('SELECT * FROM top_picks WHERE deleted_at IS NULL ORDER BY rank, updated_at, id').all() as TopPick[];
   const stockMemos = db.prepare('SELECT * FROM stock_memos WHERE deleted_at IS NULL ORDER BY created_at, id').all() as Array<MemoBackup & { deleted_at?: string | null; updated_by?: string | null }>;
   const memoSymbols = db.prepare(`SELECT s.* FROM memo_symbols s JOIN stock_memos m ON m.id = s.memo_id
     WHERE s.deleted_at IS NULL AND m.deleted_at IS NULL ORDER BY s.created_at, s.id`).all() as Array<SymbolBackup & { deleted_at?: string | null; updated_by?: string | null }>;
@@ -98,6 +101,7 @@ export function exportBackupData(): MemoBackupData {
     watchlistItems: listWatchlistItems().map(backupRow),
     tickerPresets: listTickerPresets().map(backupRow),
     ...(stockMemos.length ? { stockMemos: stockMemos.map(backupRow), memoSymbols: memoSymbols.map(backupRow) } : {}),
+    ...(topPicks.length ? { topPicks: topPicks.map(backupRow) } : {}),
   };
 }
 
@@ -298,8 +302,26 @@ export function importBackupData(data: Partial<MemoBackupData>) {
       created_at: item.created_at ?? new Date().toISOString() };
   });
 
+  const topPicks = (data.topPicks ?? []).map((item) => {
+    if (!item?.id || !Number.isInteger(item.rank) || item.rank < 1) throw new Error('ピックのバックアップが不正です');
+    validateTopPickInput({ symbol: item.symbol, market: item.market, theme: item.theme, conviction: item.conviction,
+      horizon: item.horizon, pickedAt: item.picked_at, pickedPrice: item.picked_price, targetPrice: item.target_price,
+      reviewOn: item.review_on, thesis: item.thesis, catalysts: item.catalysts, risks: item.risks, exitRule: item.exit_rule });
+    if (!Number.isFinite(Date.parse(item.created_at)) || (item.removed_at != null && !Number.isFinite(Date.parse(item.removed_at)))
+      || [item.benchmark_at_pick, item.benchmark_at_remove, item.removed_price].some((price) => price != null && (!Number.isFinite(price) || price <= 0))
+      || (item.removed_at != null && item.removed_price == null)) throw new Error('ピックの価格・日時が不正です');
+    return { id: item.id, symbol: item.symbol.trim().toUpperCase(), market: item.market, rank: item.rank,
+      theme: item.theme ?? null, conviction: item.conviction ?? null, horizon: item.horizon ?? null,
+      picked_at: item.picked_at, picked_price: item.picked_price, benchmark_at_pick: item.benchmark_at_pick ?? null,
+      target_price: item.target_price ?? null, review_on: item.review_on ?? null, thesis: item.thesis ?? null,
+      catalysts: item.catalysts ?? null, risks: item.risks ?? null, exit_rule: item.exit_rule ?? null,
+      removed_at: item.removed_at ?? null, removed_price: item.removed_price ?? null,
+      benchmark_at_remove: item.benchmark_at_remove ?? null, created_at: item.created_at };
+  });
+  if (topPicks.filter((pick) => pick.removed_at === null).length > 10) throw new Error('現在のピックは最大10件です');
+
   // 取込前にID重複を検出し、従来どおり全体を失敗させる
-  const groups = [portfolios, holdings, transactions, tradeIdeas, watchlistItems, tickerPresets, stockMemos, memoSymbols];
+  const groups = [portfolios, holdings, transactions, tradeIdeas, watchlistItems, tickerPresets, stockMemos, memoSymbols, topPicks];
   for (const rows of groups) {
     if (new Set(rows.map((row) => row.id)).size !== rows.length) {
       throw new Error('バックアップ内のIDが重複しています');
@@ -324,6 +346,7 @@ export function importBackupData(data: Partial<MemoBackupData>) {
       ['ticker_presets', tickerPresets],
       ['stock_memos', stockMemos],
       ['memo_symbols', memoSymbols],
+      ['top_picks', topPicks],
     ] as const;
     for (const [table, rows] of entries) {
       for (const row of rows) {

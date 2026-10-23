@@ -19,7 +19,22 @@ const MIGRATIONS: Array<{
   { version: 6, name: 'stock-price-volume', up: addStockPriceVolume },
   { version: 7, name: 'transaction-ledger', up: addTransactionLedger },
   { version: 8, name: 'stock-memos', up: createStockMemos },
+  { version: 9, name: 'top-picks', up: createTopPicks },
 ];
+
+function createTopPicks(db: Database.Database) {
+  db.exec(`CREATE TABLE IF NOT EXISTS top_picks (
+    id TEXT PRIMARY KEY, symbol TEXT NOT NULL, market TEXT NOT NULL, rank INTEGER NOT NULL,
+    theme TEXT, conviction TEXT CHECK (conviction IN ('high','medium','low')),
+    horizon TEXT CHECK (horizon IN ('short','medium','long')),
+    picked_at TEXT NOT NULL, picked_price REAL NOT NULL, benchmark_at_pick REAL,
+    target_price REAL, review_on TEXT, thesis TEXT, catalysts TEXT, risks TEXT, exit_rule TEXT,
+    removed_at TEXT, removed_price REAL, benchmark_at_remove REAL,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT, updated_by TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_top_picks_updated_at ON top_picks(updated_at);
+  CREATE INDEX IF NOT EXISTS idx_top_picks_current ON top_picks(removed_at, deleted_at, rank);`);
+}
 
 function createStockMemos(db: Database.Database) {
   db.exec(`
@@ -101,7 +116,7 @@ function createSyncSchema(db: Database.Database) {
   `);
   for (const table of SYNC_TABLES) {
     // 後続のマイグレーションで作るテーブルは、その版で同期列も作る
-    if (table === 'stock_memos' || table === 'memo_symbols') continue;
+    if (table === 'stock_memos' || table === 'memo_symbols' || table === 'top_picks') continue;
     db.exec(`
       ALTER TABLE ${table} ADD COLUMN deleted_at TEXT;
       ALTER TABLE ${table} ADD COLUMN updated_by TEXT;

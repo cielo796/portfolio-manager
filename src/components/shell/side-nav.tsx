@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, ChartCandlestick, ChartNoAxesCombined, Eye, LayoutDashboard, Network, Newspaper, NotebookPen, Settings } from 'lucide-react';
+import { Briefcase, ChartCandlestick, ChartNoAxesCombined, Eye, LayoutDashboard, Network, Newspaper, NotebookPen, Settings, Star } from 'lucide-react';
 import { timeText } from './market-clock';
 import type { ShellSyncState } from './use-shell-data';
 
@@ -10,6 +10,7 @@ const navigation = [
   { name: 'ホーム', href: '/', icon: LayoutDashboard },
   { name: '保有銘柄', href: '/portfolio', icon: Briefcase },
   { name: '登録銘柄', href: '/watchlist', icon: Eye },
+  { name: 'トップピック', href: '/top-picks', icon: Star },
   { name: '銘柄詳細', href: '/detail', icon: ChartCandlestick },
   { name: 'マーケット', href: '/market', icon: ChartNoAxesCombined },
   { name: 'ニュース', href: '/news', icon: Newspaper },

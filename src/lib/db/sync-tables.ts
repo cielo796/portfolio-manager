@@ -1,4 +1,4 @@
 export const SYNC_TABLES = [
   'portfolios', 'holdings', 'transactions', 'trade_ideas', 'watchlist_items', 'ticker_presets',
-  'stock_memos', 'memo_symbols',
+  'stock_memos', 'memo_symbols', 'top_picks',
 ] as const;
