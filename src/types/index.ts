@@ -6,6 +6,24 @@ export type ChartMarket = Market | 'INDEX';
 export type ChartRange = '3m' | '6m' | '1y' | '5y';
 export type ChartInterval = 'd' | 'w' | 'm';
 
+export interface DetailSymbol {
+  symbol: string;
+  market: Market;
+  name?: string;
+  sector?: string;
+}
+
+export interface ChartSettings {
+  range: ChartRange;
+  interval: ChartInterval;
+  ma5: boolean;
+  ma25: boolean;
+  ma75: boolean;
+  cost: boolean;
+  target: boolean;
+  trades: boolean;
+}
+
 export interface Candle {
   date: string;
   open: number | null;

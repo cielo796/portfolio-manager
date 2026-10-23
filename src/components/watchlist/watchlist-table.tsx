@@ -1,6 +1,8 @@
 'use client';
 
 import { Fragment, useMemo, useRef } from 'react';
+import Link from 'next/link';
+import { detailHref } from '@/components/detail/data';
 import { getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import type { WatchlistState } from '@/hooks/use-watchlist';
@@ -93,7 +95,7 @@ export function WatchlistTable(props: WatchlistState) {
                   return <div key={cell.id} role="cell" className={`flex min-w-0 items-center gap-1 px-2 ${'numeric' in meta ? 'justify-end text-right tabular-nums' : ''} ${content === '—' || content === '未設定' ? 'pm-muted' : signed !== undefined ? getProfitLossColor(signed) : id === 'toTarget' && gap !== undefined && Math.abs(gap) <= 3 + 1e-9 ? 'font-semibold text-[var(--pm-accent)]' : ''}`}>
                     <div className="min-w-0 flex-1 truncate" title={id === 'price' && row.original.price ? `${content}（更新: ${row.original.price.updated_at}）` : content}>
                       {id === 'grip' ? <span draggable={!editing && !props.isSavingLayout && !props.isSavingEdit} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.id); props.setDraggedId(item.id); }} title="ドラッグして並べ替え・別リストへ移動" className="flex cursor-grab pm-muted active:cursor-grabbing"><GripVertical className="h-3.5 w-3.5" /></span>
-                        : id === 'sparkline' ? <WatchlistSparkline closes={row.original.sparkline?.closes} /> : content}
+                        : id === 'sparkline' ? <WatchlistSparkline closes={row.original.sparkline?.closes} /> : id === 'name' ? <Link href={detailHref(item)} className="text-[var(--pm-link)] hover:underline" onDoubleClick={(event) => event.stopPropagation()}>{content}</Link> : content}
                     </div>
                     {index === visible.length - 1 && <div className="flex shrink-0 items-center gap-1" onDoubleClick={(event) => event.stopPropagation()}>
                       <button type="button" className="pm-muted hover:text-[var(--pm-link)]" aria-label={`${item.symbol}を編集`} onClick={() => startEdit(row.original)} disabled={props.isSavingEdit}><Pencil className="h-3.5 w-3.5" /></button>

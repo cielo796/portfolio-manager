@@ -1,6 +1,7 @@
 ﻿'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { usePortfolio } from '@/hooks/use-portfolio';
 import { useTickerPresets } from '@/hooks/use-ticker-presets';
 import { usePageRefresh } from '@/components/shell/refresh-context';
@@ -12,6 +13,13 @@ import { HoldingsSummaryStrip } from '@/components/holdings/summary-strip';
 import { HoldingsWorkspace } from '@/components/holdings/holdings-workspace';
 
 export default function PortfolioPage() {
+  return <Suspense fallback={<p role="status" className="p-3 pm-muted">読み込み中...</p>}><PortfolioContent /></Suspense>;
+}
+
+function PortfolioContent() {
+  const params = useSearchParams();
+  const selectedSymbol = params.get('symbol');
+  const selectedMarket = params.get('market');
   const {
     portfolios, holdings, stockPrices, summary, exchangeRate, isLoading, isRefreshing,
     refreshPrices, addHolding, addTransaction, updateHolding, removeHolding, reorderHoldings,
@@ -39,7 +47,7 @@ export default function PortfolioPage() {
     <div className="flex min-h-full min-w-0 flex-col gap-1 min-[900px]:h-full">
       <HoldingsSummaryStrip summary={summary} exchangeRate={exchangeRate} />
       {error && <p role="alert" className="shrink-0 text-[var(--pm-accent)]">{error}</p>}
-      <HoldingsWorkspace rows={rows} usdJpy={exchangeRate.rate} total={summary.total_value_jpy}
+      <HoldingsWorkspace key={`${selectedSymbol}|${selectedMarket}`} initialSelectedId={rows.find((row) => row.holding.symbol === selectedSymbol && row.holding.market === selectedMarket)?.holding.id} rows={rows} usdJpy={exchangeRate.rate} total={summary.total_value_jpy}
         onAdd={() => setAdding(true)} onRecord={() => setRecording(true)}
         onEdit={(row) => setEditingId(row.holding.id)}
         onClosePosition={(row) => removeHolding(row.holding.id)}

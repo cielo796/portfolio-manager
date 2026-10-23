@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { detailHref } from '@/components/detail/data';
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type Row, type SortingState } from '@tanstack/react-table';
 import { useColumnSettings } from '@/hooks/use-column-settings';
 import { computeHoldingSubtotal } from '@/lib/portfolio-calc';
@@ -11,10 +13,11 @@ import { HoldingDetailPane } from './detail-pane';
 
 type Grouping = 'market' | 'sector' | 'account' | 'none';
 
-export function HoldingsWorkspace({ rows, usdJpy, total, onAdd, onRecord, onEdit, onClosePosition, onSaveMemo, onReorder }: {
+export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAdd, onRecord, onEdit, onClosePosition, onSaveMemo, onReorder }: {
   rows: HoldingRow[];
   usdJpy: number;
   total: number;
+  initialSelectedId?: string;
   onAdd: () => void;
   onRecord: () => void;
   onEdit: (row: HoldingRow) => void;
@@ -25,7 +28,7 @@ export function HoldingsWorkspace({ rows, usdJpy, total, onAdd, onRecord, onEdit
   const [grouping, setGrouping] = useState<Grouping>('market');
   const [filter, setFilter] = useState('');
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [selectedId, setSelectedId] = useState<string>();
+  const [selectedId, setSelectedId] = useState<string | undefined>(initialSelectedId);
   const [draggedId, setDraggedId] = useState<string>();
   const [dropId, setDropId] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -152,6 +155,7 @@ export function HoldingsWorkspace({ rows, usdJpy, total, onAdd, onRecord, onEdit
           {Array.from(groups.entries()).map(([label, members]) => <div role="rowgroup" key={label}>
             {grouping !== 'none' && subtotal(label, members)}
             {members.map((row) => <div key={row.id} role="row" tabIndex={0} aria-selected={selected?.holding.id === row.id} draggable={canReorder && displayRows.length > 1} onClick={() => setSelectedId(row.id)} onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
               if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedId(row.id); }
               if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault();
@@ -165,7 +169,7 @@ export function HoldingsWorkspace({ rows, usdJpy, total, onAdd, onRecord, onEdit
                 const value = row.original.values[meta.id];
                 const content = formatHoldingCell(row.original, meta.id);
                 return <div key={cell.id} role="cell" title={content} className={`truncate px-2 ${'numeric' in meta ? 'text-right tabular-nums' : ''} ${content === '価格未取得' ? 'pm-muted !px-1 text-[10px]' : 'signed' in meta && typeof value === 'number' ? getProfitLossColor(value) : ''}`}>
-                  {meta.id === 'name' ? <button type="button" className="block w-full truncate text-left hover:text-[var(--pm-link)] hover:underline" onClick={() => setSelectedId(row.id)}>{content}</button> : content}
+                  {meta.id === 'name' && row.original.holding.symbol !== 'CASH' ? <Link href={detailHref(row.original.holding)} className="block w-full truncate text-left text-[var(--pm-link)] hover:underline" onClick={(event) => event.stopPropagation()}>{content}</Link> : content}
                 </div>;
               })}
             </div>)}

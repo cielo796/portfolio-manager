@@ -7,6 +7,7 @@ import { ArrowLeftRight, RefreshCw } from 'lucide-react';
 import { marketClock, timeText } from './market-clock';
 import { useShellRefresh } from './refresh-context';
 import type { ShellSyncState } from './use-shell-data';
+import { SymbolSearch } from '@/components/detail/symbol-search';
 
 export function TopBar({ sync, refreshMarket }: { sync: ShellSyncState; refreshMarket: (force: boolean) => Promise<void> }) {
   const current = useShellRefresh();
@@ -58,6 +59,7 @@ export function TopBar({ sync, refreshMarket }: { sync: ShellSyncState; refreshM
       <Image src="/brand-mark.svg" width={20} height={20} alt="" />
       <span>Portfolio Manager</span>
     </Link>
+    <SymbolSearch />
     <button type="button" className="pm-button" disabled={!current || busy} onClick={() => void refresh()} title={refreshError || '現在の画面と指数の価格を更新'}>
       <RefreshCw size={14} className={busy ? 'animate-spin' : ''} aria-hidden="true" />価格更新
       <span className="pm-update-time">{timeText(current?.updatedAt)}</span>

@@ -5,6 +5,7 @@ import { formatCurrency, formatNumber, formatPercent, getProfitLossColor } from 
 import { formatHoldingCell, type HoldingColumnId, type HoldingRow } from '@/components/holdings/columns';
 import { marketAllocation } from './home-data';
 import { HomePanel, PanelEmpty, PanelError, PanelSkeleton } from './panel';
+import { detailHref } from '@/components/detail/data';
 
 const COLUMNS: Array<[HoldingColumnId, string]> = [
   ['symbol', 'コード'], ['name', '銘柄名'], ['price', '現在値'], ['changePercent', '前日比%'],
@@ -37,7 +38,7 @@ export function HomeHoldings({ rows, summary, ...state }: PortfolioStateProps & 
               const value = row.values[key];
               const signed = ['changePercent', 'profit', 'profitPercent'].includes(key);
               return <div key={key} role="cell" title={text} className={`truncate px-2 ${index > 1 ? 'num' : ''} ${signed && typeof value === 'number' ? getProfitLossColor(value) : ''} ${text === '価格未取得' ? 'pm-muted text-[10px]' : ''}`}>
-                {key === 'symbol' ? <Link href={`/portfolio?symbol=${encodeURIComponent(row.holding.symbol)}&market=${row.holding.market}`} aria-label={`${row.holding.symbol} ${row.holding.name ?? ''}の保有詳細`} className="text-[var(--pm-link)] after:absolute after:inset-0">{text}</Link> : text}
+                {key === 'symbol' ? <Link href={`/portfolio?symbol=${encodeURIComponent(row.holding.symbol)}&market=${row.holding.market}`} aria-label={`${row.holding.symbol} ${row.holding.name ?? ''}の保有詳細`} className="text-[var(--pm-link)] after:absolute after:inset-0">{text}</Link> : key === 'name' && row.holding.symbol !== 'CASH' ? <Link href={detailHref(row.holding)} className="relative z-[1] text-[var(--pm-link)] hover:underline">{text}</Link> : text}
               </div>;
             })}
           </div>)}
@@ -60,7 +61,7 @@ export function HomeMovers({ rows, ...state }: PortfolioStateProps & { rows: Hol
         <table className="w-full min-w-[280px] table-fixed border-collapse" aria-label="今日の騰落">
           <thead className="pm-muted"><tr style={{ height: 'var(--pm-row-h)' }}><th className="w-14 px-2 text-left font-normal">コード</th><th className="px-1 text-left font-normal">銘柄名</th><th className="num w-[78px] px-1 font-normal">前日比%</th><th className="num w-[90px] px-2 font-normal">当日損益</th></tr></thead>
           <tbody>{movers.map((row) => <tr key={row.holding.id} className="border-t border-[var(--pm-divider)]" style={{ height: 'var(--pm-row-h)' }}>
-            <td className="truncate px-2 pm-muted" title={row.holding.symbol}>{row.holding.symbol}</td><td className="truncate px-1" title={row.holding.name}>{row.holding.name ?? row.holding.symbol}</td>
+            <td className="truncate px-2 pm-muted" title={row.holding.symbol}>{row.holding.symbol}</td><td className="truncate px-1" title={row.holding.name}><Link href={detailHref(row.holding)} className="text-[var(--pm-link)] hover:underline">{row.holding.name ?? row.holding.symbol}</Link></td>
             {(['changePercent', 'daily'] as const).map((key) => <td key={key} className={`num px-1 ${typeof row.values[key] === 'number' ? getProfitLossColor(row.values[key]) : 'pm-muted text-[10px]'}`}>{formatHoldingCell(row, key)}</td>)}
           </tr>)}</tbody>
         </table>
