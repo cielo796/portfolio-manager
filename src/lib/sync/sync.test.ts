@@ -385,9 +385,20 @@ describe('LAN同期エンジン・API', () => {
     await expect(engine.runSync(a, peer, transport)).rejects.toThrow('通信失敗');
     expect(row(a, 'trade_ideas', 'idea')).toBeDefined();
     expect(a.prepare('SELECT status, received, detail FROM sync_log').get()).toMatchObject({ status: 'failed', received: 1, detail: expect.stringContaining('通信失敗') });
+    const history = (await (await request('log', 'GET')).json()).logs;
+    expect(history[0]).toMatchObject({ status: 'partial', source: 'manual', error: '通信失敗', byTable: { trade_ideas: { received: 1, sent: 0 } } });
     expect(a.prepare('SELECT last_pulled_until, last_pushed_until, last_synced_at FROM sync_peers').get())
       .toEqual({ last_pulled_until: now, last_pushed_until: null, last_synced_at: null });
     expect(await engine.runSync(a, peer, direct())).toMatchObject({ received: 0, sent: 0 });
+  });
+
+  it('履歴に相手名・実行方法・テーブル別の実適用件数を記録する', async () => {
+    idea(a);
+    put(b, 'portfolios', { id: 'remote-portfolio', name: 'B側' });
+    await engine.runSync(a, peer, direct(), 'auto');
+    const logs = (await (await request('log', 'GET')).json()).logs;
+    expect(logs[0]).toMatchObject({ source: 'auto', peerName: 'B', status: 'success',
+      byTable: { portfolios: { received: 1, sent: 0 }, trade_ideas: { received: 0, sent: 1 } } });
   });
 
   it('同じDBの同期を排他し、終了後に解放する', async () => {

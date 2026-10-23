@@ -79,7 +79,7 @@ export const startSyncRelay = ({ listenPort, targetOrigin, log = () => {} }) =>
         if (res.destroyed || res.writableEnded) return;
         const headers = { 'x-forwarded-for': address };
         for (const [name, value] of Object.entries(req.headers)) {
-          if (name === 'content-type' || name.startsWith('x-pm-')) headers[name] = value;
+          if (name === 'content-type' || (name.startsWith('x-pm-') && name !== 'x-pm-discovery-token')) headers[name] = value;
         }
         headers['content-length'] = String(bodyBytes);
 

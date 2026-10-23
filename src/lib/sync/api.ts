@@ -10,8 +10,11 @@ import { verifyRequest } from './auth';
 import { acceptPairing, portValue, regenerateDevice, savePeer, startPairing, stopPairing } from './pairing';
 import { assertIdle, duplicateDeviceMessage, SyncError, validTime } from './state';
 import { fetchJson, httpTransport, normalizeAddress } from './transport';
+import { autoStatus, saveAutoConfig, startAutoSync } from './auto';
+import { assertInternalDiscovery, nearbyPeers, receiveDiscovery } from './discovery';
+import { syncHistory } from './history';
 
-export type SyncAction = 'pairing' | 'peers' | 'removePeer' | 'run' | 'log' | 'regenerate' | 'pair' | 'ping' | 'changes' | 'apply';
+export type SyncAction = 'pairing' | 'peers' | 'removePeer' | 'run' | 'log' | 'regenerate' | 'pair' | 'ping' | 'changes' | 'apply' | 'auto' | 'discovery';
 
 function publicPeer(peer: SyncPeer) {
   const { secret: _secret, ...visible } = peer;
@@ -29,11 +32,22 @@ function parseBody(raw: string): Record<string, unknown> {
 
 export async function handleSync(request: Request, action: SyncAction, id?: string, database?: Database.Database): Promise<Response> {
   try {
+    if (action === 'discovery') assertInternalDiscovery(request);
     const db = database ?? getDb();
     const raw = request.method === 'POST' ? await request.text() : '';
     const signed = ['ping', 'changes', 'apply'].includes(action);
     const caller = signed ? verifyRequest(db, request, raw) : undefined;
     const json = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
+    if (action === 'discovery') {
+      if (request.method === 'POST') receiveDiscovery(db, parseBody(raw));
+      startAutoSync(db);
+      return json({ deviceId: getDeviceId(db), deviceName: getDeviceName(db), schemaVersion: db.pragma('user_version', { simple: true }) });
+    }
+    if (action === 'auto') {
+      if (request.method === 'POST') saveAutoConfig(db, parseBody(raw));
+      startAutoSync(db);
+      return json({ ...autoStatus(db), nearby: nearbyPeers(db) });
+    }
     if (action === 'pairing') {
       if (request.method === 'DELETE') { stopPairing(db); return json({ success: true }); }
       return json(startPairing(db));
@@ -94,7 +108,12 @@ export async function handleSync(request: Request, action: SyncAction, id?: stri
       return json({ success: true });
     }
     if (action === 'regenerate') return json(regenerateDevice(db));
-    if (action === 'log') return json({ logs: db.prepare('SELECT * FROM sync_log ORDER BY started_at DESC, rowid DESC LIMIT 50').all() });
+    if (action === 'log') {
+      const params = new URL(request.url).searchParams;
+      const limit = params.has('limit') ? Number(params.get('limit')) : 50;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new SyncError('件数は1〜200で指定してください。');
+      return json({ logs: syncHistory(db, params.get('status'), limit) });
+    }
     const body = parseBody(raw);
     if (typeof body.peerId !== 'string' || !body.peerId) throw new SyncError('peerIdを指定してください。');
     const peer = db.prepare('SELECT * FROM sync_peers WHERE id = ?').get(body.peerId) as SyncPeer | undefined;
