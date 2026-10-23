@@ -11,7 +11,7 @@ const COLUMNS: Array<[HoldingColumnId, string]> = [
   ['symbol', 'コード'], ['name', '銘柄名'], ['price', '現在値'], ['changePercent', '前日比%'],
   ['valueJpy', '評価額（円）'], ['profit', '評価損益'], ['profitPercent', '損益%'], ['weight', '構成比'],
 ];
-const rowStyle = { gridTemplateColumns: '64px minmax(110px,1fr) 90px 86px 110px 100px 86px 64px', minHeight: 'var(--pm-row-h)' };
+const rowStyle = { gridTemplateColumns: '56px minmax(96px,190px) 78px 68px 100px 92px 68px minmax(56px,1fr)', minHeight: 'var(--pm-row-h)' };
 
 function PortfolioState({ loading, error, retry, children }: { loading: boolean; error: boolean; retry: () => void; children: ReactNode }) {
   return loading ? <PanelSkeleton /> : error ? <PanelError retry={retry} /> : children;
@@ -27,23 +27,23 @@ export function HomeHoldings({ rows, summary, ...state }: PortfolioStateProps & 
   };
   return <HomePanel title="保有銘柄" href="/portfolio" link="すべての列を表示">
     <PortfolioState {...state}>
-      <div className="max-h-[360px] overflow-auto">
-        <div role="table" aria-label="保有銘柄" className="min-w-[810px]">
+      <div className="max-h-[360px] overflow-x-auto overflow-y-auto">
+        <div role="table" aria-label="保有銘柄" className="min-w-[620px]">
           <div role="row" className="sticky top-0 z-10 grid items-center border-b border-[var(--pm-border)] bg-[var(--pm-heading)] pm-muted" style={rowStyle}>
-            {COLUMNS.map(([key, label], index) => <div key={key} role="columnheader" className={`px-2 ${index > 1 ? 'num' : ''}`}>{label}</div>)}
+            {COLUMNS.map(([key, label], index) => <div key={key} role="columnheader" className={index > 1 ? 'num px-1' : 'px-1.5'}>{label}</div>)}
           </div>
           {rows.map((row) => <div key={row.holding.id} role="row" className="relative grid items-center border-b border-[var(--pm-divider)] hover:bg-[var(--pm-selected-row)] focus-within:bg-[var(--pm-selected-row)]" style={rowStyle}>
             {COLUMNS.map(([key], index) => {
               const text = formatHoldingCell(row, key);
               const value = row.values[key];
               const signed = ['changePercent', 'profit', 'profitPercent'].includes(key);
-              return <div key={key} role="cell" title={text} className={`truncate px-2 ${index > 1 ? 'num' : ''} ${signed && typeof value === 'number' ? getProfitLossColor(value) : ''} ${text === '価格未取得' ? 'pm-muted text-[10px]' : ''}`}>
+              return <div key={key} role="cell" title={text} className={`${index > 1 ? 'num whitespace-nowrap px-1' : 'min-w-0 truncate px-1.5'} ${signed && typeof value === 'number' ? getProfitLossColor(value) : ''} ${text === '価格未取得' ? 'pm-muted text-[10px]' : ''}`}>
                 {key === 'symbol' ? <Link href={`/portfolio?symbol=${encodeURIComponent(row.holding.symbol)}&market=${row.holding.market}`} aria-label={`${row.holding.symbol} ${row.holding.name ?? ''}の保有詳細`} className="text-[var(--pm-link)] after:absolute after:inset-0">{text}</Link> : key === 'name' && row.holding.symbol !== 'CASH' ? <Link href={detailHref(row.holding)} className="relative z-[1] text-[var(--pm-link)] hover:underline">{text}</Link> : text}
               </div>;
             })}
           </div>)}
           <div role="row" className="grid items-center bg-[var(--pm-heading)] font-semibold" style={rowStyle}>
-            {COLUMNS.map(([key], index) => <div key={key} role="cell" className={`px-2 ${index > 1 ? 'num' : ''} ${key === 'profit' || key === 'profitPercent' ? getProfitLossColor(summary.total_profit_loss) : key === 'changePercent' ? getProfitLossColor(summary.daily_change) : ''}`}>{total[key]}</div>)}
+            {COLUMNS.map(([key], index) => <div key={key} role="cell" className={`${index > 1 ? 'num whitespace-nowrap px-1' : 'min-w-0 truncate px-1.5'} ${key === 'profit' || key === 'profitPercent' ? getProfitLossColor(summary.total_profit_loss) : key === 'changePercent' ? getProfitLossColor(summary.daily_change) : ''}`}>{total[key]}</div>)}
           </div>
         </div>
       </div>

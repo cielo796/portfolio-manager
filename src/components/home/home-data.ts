@@ -10,6 +10,23 @@ export const HOME_MARKETS = [
   { key: '^VIX', symbol: '^VIX', market: 'INDEX', name: 'VIX' },
 ] as const satisfies ReadonlyArray<Pick<SparklineItem, 'symbol' | 'market'> & { key: string; name: string }>;
 
+const tokyoClock = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+
+const tokyoParts = (date: Date) => Object.fromEntries(tokyoClock.formatToParts(date).map(({ type, value }) => [type, value]));
+
+// ニュースの日時を Asia/Tokyo 基準で「今日は時刻、今年は月日、それ以前は年月日」にする
+export function formatNewsTime(publishedAt: string, now: Date): string {
+  const published = new Date(publishedAt);
+  if (!Number.isFinite(published.getTime()) || !Number.isFinite(now.getTime())) return '—';
+  const target = tokyoParts(published);
+  const current = tokyoParts(now);
+  if (target.year !== current.year) return `${target.year}/${target.month}/${target.day}`;
+  if (target.month === current.month && target.day === current.day) return `${target.hour}:${target.minute}`;
+  return `${target.month}/${target.day} ${target.hour}:${target.minute}`;
+}
+
 export function sparklinePoints(closes: number[]): string {
   const values = closes.filter(Number.isFinite);
   if (values.length < 2) return '';

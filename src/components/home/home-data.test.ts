@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeHoldingsWithPrices, computeSummary } from '@/lib/portfolio-calc';
 import type { FundamentalMetrics, Holding } from '@/types';
-import { HOME_MARKETS, marketAllocation, sparklinePoints, upcomingEarnings } from './home-data';
+import { HOME_MARKETS, formatNewsTime, marketAllocation, sparklinePoints, upcomingEarnings } from './home-data';
 
 describe('ホームの表示データ', () => {
   it('6指数の履歴は指数市場とFX市場を指定する', () => {
@@ -46,5 +46,33 @@ describe('ホームの表示データ', () => {
     expect(allocations.map((item) => item.label)).toEqual(['米国株', '日本株', 'FX', '現金']);
     expect(allocations.reduce((sum, item) => sum + item.percent, 0)).toBeCloseTo(100);
     expect(marketAllocation(computeSummary([], 150))).toEqual([]);
+  });
+});
+
+describe('ニュースの日時表示', () => {
+  const now = new Date('2026-10-23T10:00:00+09:00');
+
+  it('今日は時刻だけ、昨日は月日と時刻を表示する', () => {
+    expect(formatNewsTime('2026-10-23T09:05:00+09:00', now)).toBe('09:05');
+    expect(formatNewsTime('2026-10-22T23:59:00+09:00', now)).toBe('10/22 23:59');
+  });
+
+  it('今日より前の今年の記事は月日を0詰めしない', () => {
+    expect(formatNewsTime('2026-01-05T08:00:00+09:00', now)).toBe('1/5 08:00');
+  });
+
+  it('日付の判定は Asia/Tokyo 基準で行う', () => {
+    expect(formatNewsTime('2026-10-22T15:30:00Z', now)).toBe('00:30');
+    expect(formatNewsTime('2026-10-23T15:30:00Z', now)).toBe('10/24 00:30');
+  });
+
+  it('年をまたぐ記事は年月日だけを表示する', () => {
+    expect(formatNewsTime('2025-12-31T23:30:00+09:00', new Date('2026-01-01T08:00:00+09:00'))).toBe('2025/12/31');
+  });
+
+  it('不正な日付は — を返す', () => {
+    expect(formatNewsTime('', now)).toBe('—');
+    expect(formatNewsTime('invalid', now)).toBe('—');
+    expect(formatNewsTime('2026-10-23T09:05:00+09:00', new Date('invalid'))).toBe('—');
   });
 });
