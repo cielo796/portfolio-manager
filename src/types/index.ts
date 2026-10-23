@@ -431,6 +431,7 @@ export interface SyncApplyResult {
   conflicts: number;
   conflictDetails: SyncConflict[];
   canonicalChanges: SyncChanges;
+  byTable?: Partial<Record<SyncTable, number>>;
 }
 export interface SyncPeer {
   id: string;
@@ -486,4 +487,44 @@ export interface HistoryBenchmarks {
   nikkei: HistoryPoint[];
   usdJpy: HistoryPoint[];
   warnings: string[];
+}
+
+export interface SyncAutoConfig {
+  mode: 'off' | 'startup' | 'interval';
+  intervalMinutes: 15 | 30 | 60;
+}
+
+export interface SyncAutoStatus {
+  config: SyncAutoConfig;
+  running: boolean;
+  lastSyncedAt: string | null;
+  nextRunAt: string | null;
+  latest: SyncHistoryEntry | null;
+}
+
+export interface SyncDiscoveredPeer {
+  deviceId: string;
+  deviceName: string;
+  schemaVersion: number;
+  address: string;
+  port: number;
+  expiresAt: number;
+}
+
+export interface SyncHistoryEntry {
+  id: string;
+  peer_device_id: string;
+  peerName: string;
+  started_at: string;
+  finished_at: string | null;
+  status: 'running' | 'success' | 'failed' | 'partial';
+  received: number;
+  sent: number;
+  conflicts: number;
+  detail: string | null;
+  source: 'manual' | 'auto';
+  durationMs: number | null;
+  error: string | null;
+  warnings: string[];
+  byTable: Partial<Record<SyncTable, { received: number; sent: number }>>;
 }

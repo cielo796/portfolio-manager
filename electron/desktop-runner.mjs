@@ -4,6 +4,8 @@ import { createServer } from 'node:net';
 import path from 'node:path';
 import process from 'node:process';
 import { startSyncRelay } from './sync-relay.mjs';
+import { randomBytes } from 'node:crypto';
+import { discoveryAddresses, startDiscovery } from './discovery.mjs';
 
 const mode = process.argv[2] === 'start' ? 'start' : 'dev';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -16,6 +18,9 @@ let webProcess;
 let electronProcess;
 let shuttingDown = false;
 let syncRelay;
+let discovery;
+let discoveryTimer;
+const discoveryToken = randomBytes(32).toString('hex');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -84,6 +89,8 @@ const terminateProcessTree = (child) => {
 const shutdown = (exitCode = 0) => {
   if (shuttingDown) return;
   shuttingDown = true;
+  clearInterval(discoveryTimer);
+  discovery?.close();
   syncRelay?.close().catch((error) => console.error('[sync-relay] Failed to close:', error));
   terminateProcessTree(electronProcess);
   terminateProcessTree(webProcess);
@@ -131,7 +138,7 @@ const run = async () => {
     console.warn(`[sync-relay] 同期ポート ${syncPort} を使用できないため、LAN同期を無効にします: ${error.message}`);
   }
   const publicSyncPort = syncRelay ? String(syncRelay.port) : '';
-  const syncEnv = { PM_SYNC_PORT: publicSyncPort, PM_SYNC_PUBLIC_PORT: publicSyncPort };
+  const syncEnv = { PM_SYNC_PORT: publicSyncPort, PM_SYNC_PUBLIC_PORT: publicSyncPort, PM_DISCOVERY_TOKEN: discoveryToken };
 
   console.log(`[desktop] Starting Next.js (${webScript}) on ${startUrl}`);
   webProcess = spawn(`${npmCommand} run ${webScript} -- --hostname 127.0.0.1 -p ${port}`, {
@@ -148,6 +155,32 @@ const run = async () => {
   });
 
   await waitForServer(startUrl);
+
+  let discoveryIdentity = '';
+  let refreshingDiscovery = false;
+  const refreshDiscovery = async () => {
+    if (refreshingDiscovery || shuttingDown) return;
+    refreshingDiscovery = true;
+    try {
+      const headers = { 'x-pm-discovery-token': discoveryToken };
+      const response = await fetch(`${startUrl}/api/sync/discovery`, { headers, signal: AbortSignal.timeout(3000) });
+      if (!response.ok) throw new Error(`Internal discovery: ${response.status}`);
+      const self = await response.json();
+      const addresses = discoveryAddresses();
+      const identity = JSON.stringify({ self, addresses });
+      if (syncRelay && identity !== discoveryIdentity && !shuttingDown) {
+        discovery?.close();
+        discovery = await startDiscovery({ self, addresses, port: syncRelay.port, log: (message) => console.warn(message), onPeer: (peer) => {
+          void fetch(`${startUrl}/api/sync/discovery`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(peer), signal: AbortSignal.timeout(3000) }).catch(() => {});
+        } });
+        discoveryIdentity = discovery.activeInterfaces ? identity : '';
+      }
+    } catch (error) { console.warn(`[discovery] ${error.message}`); }
+    finally { refreshingDiscovery = false; }
+  };
+  await refreshDiscovery();
+  discoveryTimer = setInterval(() => { void refreshDiscovery(); }, 30_000);
 
   console.log('[desktop] Launching Electron...');
 

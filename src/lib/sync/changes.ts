@@ -67,7 +67,7 @@ export function applyChanges(db: Database.Database, changes: SyncChanges, option
   validateChanges(db, changes);
   if (options.lastSyncedAt !== null && !validTime(options.lastSyncedAt)) throw new SyncError('最終同期日時が不正です。');
   return db.transaction(() => {
-    const result: SyncApplyResult = { applied: 0, skipped: 0, conflicts: 0, conflictDetails: [], canonicalChanges: emptyChanges() };
+    const result: SyncApplyResult = { applied: 0, skipped: 0, conflicts: 0, conflictDetails: [], canonicalChanges: emptyChanges(), byTable: {} };
     for (const table of tables) {
       const columns = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(({ name }) => name);
       const upsert = db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})
@@ -97,6 +97,7 @@ export function applyChanges(db: Database.Database, changes: SyncChanges, option
         if (remoteWins || changesId) {
           upsert.run(...columns.map((column) => winner[column]));
           result.applied++;
+          result.byTable![table] = (result.byTable![table] ?? 0) + 1;
         } else {
           result.skipped++;
         }
