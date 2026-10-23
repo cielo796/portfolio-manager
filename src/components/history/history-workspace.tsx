@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { HistoryBenchmarks, Portfolio, PortfolioSnapshot } from '@/types';
+import type { HistoryBenchmarks, Holding, Portfolio, PortfolioSnapshot } from '@/types';
 import { readJson, useDetailResource } from '@/components/detail/data';
 import { usePageRefresh } from '@/components/shell/refresh-context';
 import { formatCurrency, formatPercent, getProfitLossColor } from '@/lib/utils';
@@ -34,7 +34,24 @@ export function HistoryWorkspace() {
   const [message, setMessage] = useState('');
   const resource = useDetailResource<SnapshotResponse>(`/api/snapshots${portfolioId ? `?portfolioId=${encodeURIComponent(portfolioId)}` : ''}`);
   const refresh = async () => {
-    await readJson('/api/portfolio-data');
+    try {
+      const data = await readJson<{ holdings: Holding[] }>('/api/portfolio-data');
+      const holdings = data.holdings.filter((holding) => holding.symbol !== 'CASH');
+      const symbols = holdings.map((holding) => ({ symbol: holding.symbol, market: holding.market, name: holding.name }));
+      // 円換算のため、保有画面と同じく為替も更新する
+      if (holdings.length > 0 && !symbols.some((item) => item.symbol === 'USDJPY' && item.market === 'FX')) {
+        symbols.push({ symbol: 'USDJPY', market: 'FX', name: 'USD/JPY' });
+      }
+      if (symbols.length > 0) {
+        await fetch('/api/prices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbols }),
+        });
+      }
+    } catch {
+      // 価格取得に失敗しても資産記録は読み直す
+    }
     await resource.reload();
   };
   usePageRefresh(refresh, resource.loading || creating, resource.data?.snapshots.at(-1)?.updated_at ?? null, !resource.error);
