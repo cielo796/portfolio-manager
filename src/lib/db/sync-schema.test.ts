@@ -3,11 +3,13 @@ import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SYNC_TABLES } from './sync-tables';
 import type { BackupData } from './backup';
 
 const initialTime = '2026-01-01T00:00:00.000Z';
 const laterTime = '2026-01-02T00:00:00.000Z';
+// v2時点で存在した同期対象テーブル
+const LEGACY_SYNC_TABLES = ['portfolios', 'holdings', 'transactions', 'trade_ideas', 'watchlist_items', 'ticker_presets'] as const;
+const MEMO_TABLES = ['stock_memos', 'memo_symbols'] as const;
 const fixture: BackupData = {
   portfolios: [{ id: 'account', name: '口座', broker: '', created_at: initialTime, updated_at: initialTime }],
   holdings: [{
@@ -82,8 +84,10 @@ describe('同期スキーマと論理削除', () => {
         ALTER TABLE transactions DROP COLUMN holding_id;
         ALTER TABLE holdings DROP COLUMN ledger_opening_shares;
         ALTER TABLE holdings DROP COLUMN ledger_opening_cost;
+        DROP TABLE IF EXISTS memo_symbols;
+        DROP TABLE IF EXISTS stock_memos;
       `);
-      for (const table of SYNC_TABLES) {
+      for (const table of LEGACY_SYNC_TABLES) {
         legacy.exec(`
           DROP INDEX idx_${table}_updated_at;
           ALTER TABLE ${table} DROP COLUMN deleted_at;
@@ -107,9 +111,18 @@ describe('同期スキーマと論理削除', () => {
       expect(legacy.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(3);
       expect(legacy.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name = 'keep_ledger_holding'").get())
         .toEqual({ name: 'keep_ledger_holding' });
-      for (const table of SYNC_TABLES) {
+      for (const table of LEGACY_SYNC_TABLES) {
         const rows = legacy.prepare(`SELECT deleted_at, updated_by FROM ${table}`).all();
         expect(rows).toEqual([{ deleted_at: null, updated_by: null }]);
+        expect(legacy.prepare(`PRAGMA index_list(${table})`).all()).toEqual(expect.arrayContaining([
+          expect.objectContaining({ name: `idx_${table}_updated_at` }),
+        ]));
+      }
+      for (const table of MEMO_TABLES) {
+        expect(legacy.prepare(`PRAGMA table_info(${table})`).all()).toEqual(expect.arrayContaining([
+          expect.objectContaining({ name: 'deleted_at' }),
+          expect.objectContaining({ name: 'updated_by' }),
+        ]));
         expect(legacy.prepare(`PRAGMA index_list(${table})`).all()).toEqual(expect.arrayContaining([
           expect.objectContaining({ name: `idx_${table}_updated_at` }),
         ]));
@@ -270,9 +283,12 @@ describe('同期スキーマと論理削除', () => {
     api.importBackupData(JSON.parse(JSON.stringify(backup)));
     const restored = api.exportBackupData();
     for (const key of Object.keys(backup) as Array<keyof BackupData>) expect(restored[key]).toHaveLength(backup[key].length);
-    for (const table of SYNC_TABLES) {
+    for (const table of LEGACY_SYNC_TABLES) {
       expect(db.prepare(`SELECT updated_at, updated_by FROM ${table} WHERE deleted_at IS NULL`).all())
         .toEqual([expect.objectContaining({ updated_at: laterTime, updated_by: api.getDeviceId() })]);
+    }
+    for (const table of MEMO_TABLES) {
+      expect(db.prepare(`SELECT updated_at FROM ${table} WHERE deleted_at IS NULL`).all()).toEqual([]);
     }
     expect(row('watchlist_items', extra.id)).toMatchObject({ deleted_at: laterTime });
     expect(db.prepare('SELECT secret FROM sync_peers WHERE id = ?').get('peer')).toEqual({ secret: 'secret-value' });
