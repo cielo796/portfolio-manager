@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { LatestMemos } from '@/components/memos/latest-memos';
 import { TopPickBadge, useTopPickRanks } from '@/components/top-picks/top-pick-badge';
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { ChartData, DetailSymbol, FundamentalMetrics, Holding, NewsItem, StockPrice, Transaction, WatchlistItem, WatchlistKey } from '@/types';
 import { priceKey } from '@/lib/price-key';
@@ -11,6 +12,8 @@ import { getSectorLabel, resolveSectorForSymbol } from '@/lib/sectors';
 import { getMarketLabel, getProfitLossColor } from '@/lib/utils';
 import { WATCHLIST_TABS } from '@/components/watchlist/constants';
 import { usePageRefresh } from '@/components/shell/refresh-context';
+import { ResizeHandle } from '@/components/shell/resize-handle';
+import { useResizableWidth } from '@/hooks/use-resizable-width';
 import { detailHref, useDetailCatalog, useDetailResource } from './data';
 import { useChartSettings } from './chart-settings';
 import { CandlestickChart } from './candlestick-chart';
@@ -18,6 +21,7 @@ import { MetricsPane, moneyText, numberText, percentText } from './metrics-pane'
 
 const panel = 'min-w-0 rounded border border-[var(--pm-border)] bg-[var(--pm-panel)]';
 const activeButton = '!border-[#6b5226] !bg-[var(--pm-active-bg)] !text-[var(--pm-active-text)]';
+const LIST_WIDTH = { storageKey: 'pm.layout.detail.listWidth', defaultWidth: 240, min: 200, max: 520 } as const;
 
 export function DetailWorkspace() {
   const params = useSearchParams();
@@ -34,7 +38,8 @@ export function DetailWorkspace() {
   useEffect(() => { if (!symbolParam && selectedHref) router.replace(selectedHref, { scroll: false }); }, [symbolParam, selectedHref, router]);
   const list = tab === 'holdings' ? catalog.holdings.filter((item) => item.symbol !== 'CASH') : catalog.watchlist.filter((item) => item.list_key === tab);
   const unique = [...new Map(list.map((item) => [priceKey(item.symbol, item.market), item])).values()];
-  return <div className="grid min-h-full min-w-0 grid-cols-1 items-start gap-1 min-[1100px]:grid-cols-[240px_minmax(0,1fr)]">
+  const { width: listWidth, handleProps: listHandleProps } = useResizableWidth(LIST_WIDTH);
+  return <div className="grid min-h-full min-w-0 grid-cols-1 items-start gap-1 min-[1100px]:grid-cols-[var(--pm-detail-list-w)_6px_minmax(0,1fr)]" style={{ '--pm-detail-list-w': `${listWidth}px` } as CSSProperties}>
     <section aria-label="銘柄リスト" className={`${panel} min-[1100px]:sticky min-[1100px]:top-0`}>
       <div role="group" aria-label="銘柄リスト切替" className="flex flex-wrap border-b border-[var(--pm-border)] px-1">
         {([{ key: 'holdings', label: '保有' }, ...WATCHLIST_TABS] as const).map((item) => <button type="button" key={item.key} aria-pressed={tab === item.key} onClick={() => setTab(item.key)} className={`h-7 border-b-2 px-2 ${tab === item.key ? 'border-[var(--pm-accent)] text-[var(--pm-active-text)]' : 'border-transparent pm-muted'}`}>{item.label}</button>)}
@@ -53,6 +58,7 @@ export function DetailWorkspace() {
         {catalog.error && <p role="alert" className="p-3 text-[var(--pm-accent)]">銘柄リストの一部を取得できませんでした。</p>}
       </div>
     </section>
+    <ResizeHandle className="hidden min-[1100px]:flex" value={listWidth} min={LIST_WIDTH.min} max={LIST_WIDTH.max} label="銘柄リストの幅" handleProps={listHandleProps} />
     {invalid ? <p role="alert" className={`${panel} p-4`}>銘柄コードと市場（US / JP / FX）を確認してください。</p> : selected ? <DetailContent key={priceKey(selected.symbol, selected.market)} selected={selected} holdings={catalog.holdings} watchlist={catalog.watchlist} cachedPrice={catalog.prices[priceKey(selected.symbol, selected.market)]} /> : <p role="status" className={`${panel} p-4 pm-muted`}>{catalog.loading ? '銘柄を読み込み中…' : '保有・登録銘柄がありません。上部の銘柄検索から開いてください。'}</p>}
   </div>;
 }
