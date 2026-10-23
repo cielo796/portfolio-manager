@@ -321,7 +321,7 @@ body {
   text-overflow: ellipsis;
 }
 
-.pm-main table :is(th, td) {
+.pm-main table:not(.tv-lightweight-charts table) :is(th, td) {
   height: var(--pm-row-h);
   padding-block: calc((var(--pm-row-h) - 20px) / 2);
 }
@@ -407,7 +407,7 @@ body {
 }
 
 /* テーブルのホバーエフェクト */
-table tbody tr {
+table:not(.tv-lightweight-charts table) tbody tr {
   transition: background-color 0.15s ease;
 }
 

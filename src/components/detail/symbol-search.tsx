@@ -37,7 +37,7 @@ export function SymbolSearch() {
     document.addEventListener('pointerdown', outside);
     return () => { document.removeEventListener('keydown', shortcut); document.removeEventListener('pointerdown', outside); };
   }, []);
-  const choose = (href: string) => { setOpen(false); input.current?.blur(); router.push(href); };
+  const choose = (href: string) => { setOpen(false); setQuery(''); setIndex(0); input.current?.blur(); router.push(href); };
   const expanded = open && query.trim().length > 0;
   return <div ref={root} className="relative min-w-24 max-w-64 flex-1">
     <input ref={input} role="combobox" aria-label="銘柄検索" aria-autocomplete="list" aria-expanded={expanded} aria-controls={expanded ? 'pm-symbol-options' : undefined} aria-activedescendant={expanded && active >= 0 ? `pm-symbol-option-${active}` : undefined} placeholder="銘柄検索 Ctrl+K" value={query} onFocus={() => { setOpen(true); void catalog.reload(); void tickers.reload(); }} onBlur={(event) => { if (!root.current?.contains(event.relatedTarget as Node | null)) setOpen(false); }} onChange={(event) => { setQuery(event.target.value); setIndex(0); setOpen(true); }} onKeyDown={(event) => {

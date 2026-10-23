@@ -21,7 +21,7 @@ export function CandlestickChart({ candles, settings, cost, targets, transaction
     const down = color('--pm-down');
     const chart = createChart(container.current, {
       autoSize: true,
-      layout: { background: { type: ColorType.Solid, color: color('--pm-panel') }, textColor: color('--pm-muted'), fontSize: 11, attributionLogo: true },
+      layout: { background: { type: ColorType.Solid, color: color('--pm-panel') }, textColor: color('--pm-muted'), fontSize: 11, attributionLogo: true, panes: { separatorColor: color('--pm-border'), separatorHoverColor: color('--pm-border'), enableResize: false } },
       grid: { vertLines: { color: color('--pm-divider') }, horzLines: { color: color('--pm-divider') } },
       rightPriceScale: { borderColor: color('--pm-border') },
       timeScale: { borderColor: color('--pm-border') },
