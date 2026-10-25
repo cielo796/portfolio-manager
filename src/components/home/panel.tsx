@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-export function HomePanel({ title, href, link, children }: { title: string; href?: string; link?: string; children: ReactNode }) {
-  return <section aria-label={title} className="min-w-0 overflow-hidden rounded border border-[var(--pm-border)] bg-[var(--pm-panel)]">
-    <header className="flex h-[30px] items-center gap-2 border-b border-[var(--pm-border)] bg-[var(--pm-heading)] px-2.5">
+export function HomePanel({ title, href, link, children, bodyClassName = '' }: { title: string; href?: string; link?: string; children: ReactNode; bodyClassName?: string }) {
+  return <section aria-label={title} className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded border border-[var(--pm-border)] bg-[var(--pm-panel)] min-[1100px]:h-full">
+    <header className="flex h-[30px] shrink-0 items-center gap-2 border-b border-[var(--pm-border)] bg-[var(--pm-heading)] px-2.5">
       <h2 className="min-w-0 flex-1 truncate text-xs font-semibold">{title}</h2>
       {href && <Link href={href} className="shrink-0 text-[var(--pm-link)] hover:underline">{link} →</Link>}
     </header>
-    {children}
+    <div className={`min-h-0 min-w-0 flex-1 overflow-auto ${bodyClassName}`}>{children}</div>
   </section>;
 }
 

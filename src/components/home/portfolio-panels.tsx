@@ -6,11 +6,12 @@ import type { HoldingWithPrice, PortfolioSummary, SectorAllocation } from '@/typ
 import { formatCurrency, formatPercent, getProfitLossColor } from '@/lib/utils';
 import { formatHoldingCell, type HoldingColumnId, type HoldingRow } from '@/components/holdings/columns';
 import { portfolioAllocation } from './home-data';
+import { HomeAllocationDonut } from './allocation-donut';
 import { AllocationDonut } from '@/components/charts/allocation-donut';
+import { useHomeDesktop } from './home-layout';
 import { AllocationTabs, type AllocationView } from '@/components/charts/allocation-tabs';
 import { HomePanel, PanelEmpty, PanelError, PanelSkeleton } from './panel';
 import { detailHref } from '@/components/detail/data';
-import { HomeHistory } from './history-panel';
 
 const COLUMNS: Array<[HoldingColumnId, string]> = [
   ['symbol', 'コード'], ['name', '銘柄名'], ['price', '現在値'], ['changePercent', '前日比%'],
@@ -32,7 +33,7 @@ export function HomeHoldings({ rows, summary, ...state }: PortfolioStateProps & 
   };
   return <HomePanel title="保有銘柄" href="/portfolio" link="すべての列を表示">
     <PortfolioState {...state}>
-      <div className="max-h-[360px] overflow-x-auto overflow-y-auto">
+      <div className="max-h-[360px] overflow-auto min-[1100px]:max-h-none min-[1100px]:overflow-visible">
         <div role="table" aria-label="保有銘柄" className="min-w-[620px]">
           <div role="row" className="sticky top-0 z-10 grid items-center border-b border-[var(--pm-border)] bg-[var(--pm-heading)] pm-muted" style={rowStyle}>
             {COLUMNS.map(([key, label], index) => <div key={key} role="columnheader" className={index > 1 ? 'num px-1' : 'px-1.5'}>{label}</div>)}
@@ -62,7 +63,7 @@ export function HomeMovers({ rows, ...state }: PortfolioStateProps & { rows: Hol
     .sort((a, b) => (b.holding.change_percent ?? -Infinity) - (a.holding.change_percent ?? -Infinity));
   return <HomePanel title="今日の騰落（保有）">
     <PortfolioState {...state}>
-      <div className="max-h-[320px] overflow-auto">
+      <div className="max-h-[320px] overflow-auto min-[1100px]:max-h-none min-[1100px]:overflow-visible">
         <table className="w-full min-w-[280px] table-fixed border-collapse" aria-label="今日の騰落">
           <thead className="pm-muted"><tr style={{ height: 'var(--pm-row-h)' }}><th className="w-14 px-2 text-left font-normal">コード</th><th className="px-1 text-left font-normal">銘柄名</th><th className="num w-[78px] px-1 font-normal">前日比%</th><th className="num w-[90px] px-2 font-normal">当日損益</th></tr></thead>
           <tbody>{movers.map((row) => <tr key={row.holding.id} className="border-t border-[var(--pm-divider)]" style={{ height: 'var(--pm-row-h)' }}>
@@ -100,13 +101,15 @@ function subscribeAllocationView(callback: () => void) {
   };
 }
 
-export function HomeAllocation({ summary, holdings, usdJpy, loading, error, retry }: PortfolioStateProps & {
+export function HomeAllocation({ holdings, usdJpy, loading, error, retry }: PortfolioStateProps & {
   sectors?: SectorAllocation[];
   summary: PortfolioSummary;
   holdings: HoldingWithPrice[];
   usdJpy: number;
 }) {
   const view = useSyncExternalStore(subscribeAllocationView, readAllocationView, () => 'holding' as const);
+  const desktop = useHomeDesktop();
+  const Donut = desktop ? HomeAllocationDonut : AllocationDonut;
   const data = useMemo(() => portfolioAllocation(holdings, usdJpy), [holdings, usdJpy]);
   const setView = (next: AllocationView) => {
     allocationViewMemory = next;
@@ -114,9 +117,9 @@ export function HomeAllocation({ summary, holdings, usdJpy, loading, error, retr
     window.dispatchEvent(new Event(ALLOCATION_VIEW_EVENT));
   };
   const items = view === 'holding' ? data.holdingItems : view === 'sector' ? data.sectorItems : data.marketItems;
-  return <div className="min-w-0 space-y-1"><HomePanel title="配分"><PortfolioState loading={loading} error={error} retry={retry}>
-    <div className="p-2"><AllocationTabs view={view} onChange={setView} market>
-      <AllocationDonut items={items} holdingCount={data.holdingCount} missingCount={data.missingCount} label={view === 'holding' ? '銘柄別配分' : view === 'sector' ? 'セクター別配分' : '市場別配分'} />
+  return <HomePanel title="配分"><PortfolioState loading={loading} error={error} retry={retry}>
+    <div className="p-2 min-[1100px]:flex min-[1100px]:h-full min-[1100px]:flex-col min-[1100px]:[&>[role=tabpanel]]:min-h-0 min-[1100px]:[&>[role=tabpanel]]:flex-1 min-[1100px]:[&>[role=tablist]]:shrink-0"><AllocationTabs view={view} onChange={setView} market>
+      <Donut items={items} holdingCount={data.holdingCount} missingCount={data.missingCount} label={view === 'holding' ? '銘柄別配分' : view === 'sector' ? 'セクター別配分' : '市場別配分'} />
     </AllocationTabs></div>
-  </PortfolioState></HomePanel>{!loading && !error && <HomeHistory revision={summary.total_value_jpy} />}</div>;
+  </PortfolioState></HomePanel>;
 }
