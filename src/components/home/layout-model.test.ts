@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HOME_LAYOUTS, homeLayoutKey, parseHomeLayout, type HomeLayoutName } from './layout-model';
+import { createLayoutStorage } from '@/lib/resizable-layout';
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('ホームの保存レイアウト', () => {
   it.each(Object.keys(HOME_LAYOUTS) as HomeLayoutName[])('%s の既定比率は合計100で最小サイズを満たす', (name) => {
@@ -19,6 +22,19 @@ describe('ホームの保存レイアウト', () => {
     expect(parseHomeLayout(JSON.stringify(layout), 'bottom')).toEqual(layout);
     expect(parseHomeLayout('{"holdings":78,"market":22}', 'top')).toEqual({ holdings: 78, market: 22 });
     expect(parseHomeLayout('{"top":66.666667,"bottom":33.333333}', 'rows')).toEqual({ top: 66.666667, bottom: 33.333333 });
+  });
+
+  it.each(Object.keys(HOME_LAYOUTS) as HomeLayoutName[])('%s の旧保存形式は共通側でもそのまま復元できる', (name) => {
+    const savedLayouts = {
+      rows: { top: 60, bottom: 40 }, top: { holdings: 70, market: 30 },
+      bottom: { movers: 12, allocation: 48, earnings: 15, news: 25 }, allocation: { donut: 55, history: 45 },
+    };
+    const layout = JSON.stringify(savedLayouts[name]);
+    const getItem = vi.fn(() => layout);
+    vi.stubGlobal('window', { localStorage: { getItem } });
+    expect(parseHomeLayout(layout, name)).toEqual(savedLayouts[name]);
+    expect(JSON.parse(createLayoutStorage(HOME_LAYOUTS[name]).getItem('unused')!)).toEqual(savedLayouts[name]);
+    expect(getItem).toHaveBeenCalledWith(`pm.home.layout.${name}`);
   });
 
   it.each([

@@ -5,12 +5,12 @@ import { formatNewsDateTime } from './format';
 
 export function NewsPreviewPane({ item }: { item: NewsItem | null }) {
   return (
-    <section aria-labelledby="news-preview" className="flex min-h-0 min-w-0 flex-col rounded border border-[var(--pm-border)] bg-[var(--pm-panel)]">
+    <section aria-labelledby="news-preview" className="flex min-h-0 min-w-0 flex-col rounded border border-[var(--pm-border)] bg-[var(--pm-panel)] min-[900px]:h-full">
       <div className="flex h-[30px] shrink-0 items-center border-b border-[var(--pm-border)] px-2.5">
         <h2 id="news-preview" className="text-xs font-semibold">プレビュー</h2>
       </div>
       {item ? (
-        <article className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto p-3">
+        <article className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-auto p-3 [overflow-wrap:anywhere] [&>*]:shrink-0">
           <div className="flex flex-wrap gap-2.5 text-[11px] text-[var(--pm-muted)]">
             <span className="tabular-nums">{formatNewsDateTime(item.published_at)}</span>
             <span>{item.source}</span>

@@ -6,10 +6,13 @@ import { fetchNews, fetchNewsFilterData } from './api';
 import { sortNewsNewestFirst } from './format';
 import { NewsFilterPane } from './news-filter-pane';
 import { NewsListPane } from './news-list-pane';
+import { NewsLayout } from './news-layout';
 import { NewsPreviewPane } from './news-preview-pane';
+import { useNewsListColumns } from './use-news-list-columns';
 import type { NewsFilterMode, NewsSymbolOption } from './types';
 
 export function NewsWorkspace() {
+  const columns = useNewsListColumns();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
@@ -168,31 +171,31 @@ export function NewsWorkspace() {
   };
 
   return (
-    <div className="flex min-h-full min-w-0 flex-col min-[900px]:h-full">
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-1 min-[900px]:grid-cols-[210px_minmax(0,1fr)_minmax(300px,380px)]">
-        <NewsFilterPane
-          mode={mode}
-          onModeChange={setMode}
-          symbols={symbols}
-          excludedSymbols={excludedSymbols}
-          onToggleSymbol={toggleSymbol}
-          sources={sources}
-          excludedSources={excludedSources}
-          onToggleSource={toggleSource}
-        />
-        <NewsListPane
-          news={visibleNews}
-          selectedId={selected?.id ?? null}
-          onSelect={(item) => setSelectedId(item.id)}
-          fetchedAt={fetchedAt}
-          loading={loading}
-          refreshing={refreshing}
-          error={error}
-          onRefresh={() => void reload(true)}
-          onRetry={() => void reload(false)}
-        />
-        <NewsPreviewPane item={selected} />
-      </div>
-    </div>
+    <NewsLayout
+      onReset={columns.reset}
+      filter={<NewsFilterPane
+        mode={mode}
+        onModeChange={setMode}
+        symbols={symbols}
+        excludedSymbols={excludedSymbols}
+        onToggleSymbol={toggleSymbol}
+        sources={sources}
+        excludedSources={excludedSources}
+        onToggleSource={toggleSource}
+      />}
+      list={<NewsListPane
+        columns={columns}
+        news={visibleNews}
+        selectedId={selected?.id ?? null}
+        onSelect={(item) => setSelectedId(item.id)}
+        fetchedAt={fetchedAt}
+        loading={loading}
+        refreshing={refreshing}
+        error={error}
+        onRefresh={() => void reload(true)}
+        onRetry={() => void reload(false)}
+      />}
+      preview={<NewsPreviewPane item={selected} />}
+    />
   );
 }

@@ -30,18 +30,18 @@ export function NewsFilterPane({
   onToggleSource,
 }: NewsFilterPaneProps) {
   return (
-    <section aria-labelledby="news-filter" className="flex min-h-0 min-w-0 flex-col rounded border border-[var(--pm-border)] bg-[var(--pm-panel)]">
+    <section aria-labelledby="news-filter" className="flex min-h-0 min-w-0 flex-col rounded border border-[var(--pm-border)] bg-[var(--pm-panel)] min-[900px]:h-full">
       <div className="flex h-[30px] shrink-0 items-center border-b border-[var(--pm-border)] px-2.5">
         <h2 id="news-filter" className="text-xs font-semibold">絞り込み</h2>
       </div>
-      <div role="group" aria-label="銘柄の範囲" className="flex shrink-0 px-2.5 py-2">
+      <div role="group" aria-label="銘柄の範囲" className="flex shrink-0 overflow-x-auto px-2.5 py-2">
         {MODES.map(([value, label], index) => (
           <button
             key={value}
             type="button"
             aria-pressed={mode === value}
             onClick={() => onModeChange(value)}
-            className={`h-6 border px-2.5 text-[11px] ${index === 0 ? 'rounded-l' : ''} ${index === MODES.length - 1 ? 'rounded-r' : ''} ${index > 0 ? '-ml-px' : ''} ${
+            className={`h-6 shrink-0 border px-2.5 text-[11px] ${index === 0 ? 'rounded-l' : ''} ${index === MODES.length - 1 ? 'rounded-r' : ''} ${index > 0 ? '-ml-px' : ''} ${
               mode === value
                 ? 'border-[#6b5226] bg-[var(--pm-active-bg)] text-[var(--pm-active-text)]'
                 : 'border-[var(--pm-input-border)] bg-[#1d2530] text-[#c3ccd8] hover:border-[var(--pm-accent)]'
