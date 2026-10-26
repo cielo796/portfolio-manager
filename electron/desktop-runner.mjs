@@ -188,8 +188,9 @@ export async function runDesktop() {
     const electronEnv = createChildEnv({ PM_DESKTOP_RUNNER: '1' });
     delete electronEnv.ELECTRON_RUN_AS_NODE;
     // 二重起動ではサーバーを作らず、Electronのsecond-instanceで既存ウィンドウを表示する。
+    // windowsHide: true だとWindowsで初回ShowWindowがSW_HIDE扱いになり、ウィンドウが非表示のままになるためElectronだけ無効にする。
     electronProcess = spawn(electronPath, [root], {
-      cwd: root, env: electronEnv, stdio: ['ignore', 'inherit', 'inherit', 'ipc'], windowsHide: true,
+      cwd: root, env: electronEnv, stdio: ['ignore', 'inherit', 'inherit', 'ipc'], windowsHide: false,
     });
     electronProcess.once('exit', (code, signal) => { void shutdown(code ?? (signal ? 1 : 0)); });
     await new Promise((resolve, reject) => {

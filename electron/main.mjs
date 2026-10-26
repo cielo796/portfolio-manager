@@ -21,18 +21,16 @@ let serverProcess;
 let syncRelay;
 let serverLog;
 let primaryWindow;
-let pendingFocus = false;
 let cleanupStarted = false;
 let cleanupFinished = false;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const focusWindow = () => {
-  if (!primaryWindow || primaryWindow.isDestroyed()) { pendingFocus = true; return; }
+  if (!primaryWindow || primaryWindow.isDestroyed()) return;
   if (primaryWindow.isMinimized()) primaryWindow.restore();
-  primaryWindow.show();
+  if (!primaryWindow.isVisible()) primaryWindow.show();
   primaryWindow.focus();
-  pendingFocus = false;
 };
 
 app.on('second-instance', focusWindow);
@@ -180,6 +178,7 @@ function createWindow(startUrl) {
     autoHideMenuBar: true,
     title: 'Portfolio Manager',
     icon,
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -196,12 +195,44 @@ function createWindow(startUrl) {
       relaunchDisplayName: APP_NAME,
     });
   }
-  win.once('closed', () => { if (primaryWindow === win) primaryWindow = undefined; });
+
+  let fallbackTimer;
+  const reveal = () => {
+    if (win.isDestroyed()) return;
+    if (win.isMinimized()) win.restore();
+    if (!win.isVisible()) win.show();
+  };
+  const revealAndFocus = () => {
+    reveal();
+    win.focus();
+  };
+
+  win.once('closed', () => {
+    clearTimeout(fallbackTimer);
+    if (primaryWindow === win) primaryWindow = undefined;
+  });
+  // 描画準備後に表示し、直後に非表示へ戻る環境向けに300ms後も確認する。
+  win.once('ready-to-show', () => {
+    clearTimeout(fallbackTimer);
+    revealAndFocus();
+    setTimeout(() => {
+      if (win.isDestroyed() || win.isVisible()) return;
+      if (win.isMinimized()) win.restore();
+      win.show();
+    }, 300);
+  });
+  // 読み込み失敗などでready-to-showが来なくても非表示のままにしない。
+  win.webContents.on('did-fail-load', (_event, _code, _description, _url, isMainFrame) => {
+    if (isMainFrame === false) return;
+    clearTimeout(fallbackTimer);
+    revealAndFocus();
+  });
+  fallbackTimer = setTimeout(revealAndFocus, 5000);
+
   win.webContents.on('render-process-gone', (_event, details) => {
     console.error(`[desktop] Renderer exited: ${details.reason}`);
     app.quit();
   });
-  if (pendingFocus) win.once('ready-to-show', focusWindow);
 
   win.loadURL(startUrl);
 

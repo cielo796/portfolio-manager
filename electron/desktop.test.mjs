@@ -72,6 +72,12 @@ describe('プロセスの終了と監視（OS操作はモック）', () => {
     await assertion;
   });
 
+  it('Electronの起動だけwindowsHideを無効にし、ウィンドウが非表示にならないようにする', () => {
+    const source = fs.readFileSync(new URL('./desktop-runner.mjs', import.meta.url), 'utf8');
+    const electronSpawn = source.match(/electronProcess = spawn\(electronPath,[\s\S]*?\n\s*\}\);/)?.[0] ?? '';
+    expect(electronSpawn).toContain('windowsHide: false');
+  });
+
   it('使用中のポートを警告し、既存サーバーを停止せず回避する', async () => {
     const occupied = createServer();
     await new Promise((resolve) => occupied.listen(0, '127.0.0.1', resolve));
