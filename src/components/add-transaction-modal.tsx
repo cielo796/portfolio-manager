@@ -11,11 +11,12 @@ interface AddTransactionModalProps {
   onSubmit: (data: TransactionFormData) => Promise<void> | void;
   portfolios: { id: string; name: string }[];
   tickerPresets: TickerPreset[];
+  initial?: Partial<TransactionFormData>;
 }
 
 export type TransactionFormData = RecordInput;
 
-export function AddTransactionModal({ isOpen, onClose, onSubmit, portfolios, tickerPresets }: AddTransactionModalProps) {
+export function AddTransactionModal({ isOpen, onClose, onSubmit, portfolios, tickerPresets, initial }: AddTransactionModalProps) {
   const [context, setContext] = useState<{ holdings: Holding[]; rate?: number }>();
   const [error, setError] = useState('');
   useEffect(() => {
@@ -33,7 +34,7 @@ export function AddTransactionModal({ isOpen, onClose, onSubmit, portfolios, tic
     <div className="absolute inset-0 bg-black/60" onClick={onClose} />
     <section role="dialog" aria-modal="true" aria-labelledby="add-record-title" className="relative max-h-[90vh] w-full max-w-sm overflow-auto rounded border border-[var(--pm-border)] bg-[var(--pm-panel)] text-xs shadow-2xl">
       <div className="flex items-center justify-between border-b border-[var(--pm-border)] px-3 py-2"><h2 id="add-record-title">売買・配当を記録</h2><button aria-label="閉じる" onClick={onClose}><X size={16} /></button></div>
-      {context ? <RecordForm portfolios={portfolios} holdings={context.holdings} candidates={tickerPresets} currentRate={context.rate} onCancel={onClose} onSubmit={async (input) => {
+      {context ? <RecordForm portfolios={portfolios} holdings={context.holdings} candidates={tickerPresets} currentRate={context.rate} initial={initial} onCancel={onClose} onSubmit={async (input) => {
         await onSubmit(input);
         onClose();
         window.location.reload();

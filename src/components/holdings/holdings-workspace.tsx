@@ -1,9 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { detailHref } from '@/components/detail/data';
-import { TopPickBadge, useTopPickRanks } from '@/components/top-picks/top-pick-badge';
+import { useRouter } from 'next/navigation';
+import type { StockPrice, TopPickView, TransactionType, WatchlistItem, WatchlistKey } from '@/types';
+import { detailHref, readJson, useDetailResource } from '@/components/detail/data';
+import { TopPickBadge } from '@/components/top-picks/top-pick-badge';
+import { ContextMenu } from '@/components/shell/context-menu';
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type Row, type SortingState } from '@tanstack/react-table';
 import { useColumnSettings } from '@/hooks/use-column-settings';
 import { computeHoldingSubtotal } from '@/lib/portfolio-calc';
@@ -12,6 +15,9 @@ import { createHoldingsCsv, holdingsCsvFilename } from './csv';
 import { HOLDING_COLUMNS, formatHoldingCell, holdingMarket, type HoldingColumnId, type HoldingRow } from './columns';
 import { HoldingDetailPane } from './detail-pane';
 import { HoldingsAllocationPopover } from './allocation-popover';
+import { buildHoldingMenuItems, toYahooSymbol, type HoldingMenuActions } from './context-menu-items';
+import { HoldingActionModal } from './action-modal';
+import { DeleteHoldingDialog } from './delete-dialog';
 
 type Grouping = 'market' | 'sector' | 'account' | 'none';
 
@@ -35,7 +41,15 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
   const [dropId, setDropId] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const topPicks = useTopPickRanks();
+  const router = useRouter();
+  const columnSettings = useRef<HTMLDetailsElement>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; row?: HoldingRow; target: HTMLElement; key: number }>();
+  const menuSequence = useRef(0);
+  const [actionModal, setActionModal] = useState<{ mode: 'add' | TransactionType; row: HoldingRow }>();
+  const [deleting, setDeleting] = useState<HoldingRow>();
+  const watchlist = useDetailResource<{ watchlistItems: WatchlistItem[] }>('/api/watchlist');
+  const picks = useDetailResource<{ topPicks: TopPickView[] }>('/api/top-picks');
+  const topPicks = picks.data?.topPicks ?? [];
   const { visibility, setVisibility, sizing, setSizing } = useColumnSettings();
   const filtered = useMemo(() => {
     const query = filter.trim().toLocaleLowerCase();
@@ -83,6 +97,50 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+  const openMenu = (x: number, y: number, target: HTMLElement, row?: HoldingRow) => {
+    if (row) setSelectedId(row.holding.id);
+    target.focus({ preventScroll: true });
+    setMenu({ x, y, target, row, key: ++menuSequence.current });
+    void watchlist.reload(); void picks.reload();
+  };
+  const runMenuAction = (action: () => Promise<void>) => {
+    setError('');
+    void Promise.resolve().then(action).catch((cause) => setError(cause instanceof Error ? cause.message : '操作に失敗しました。'));
+  };
+  const menuRow = menu?.row;
+  const menuHolding = menuRow?.holding;
+  const actions: HoldingMenuActions = {
+    detail: () => { if (menuHolding) router.push(detailHref(menuHolding)); },
+    memo: () => { if (menuHolding) router.push(`/memos?symbol=${encodeURIComponent(menuHolding.symbol)}&market=${menuHolding.market}&new=1`); },
+    record: (mode) => { if (menuRow) setActionModal({ mode, row: menuRow }); },
+    edit: () => { if (menuRow) onEdit(menuRow); },
+    add: () => { if (menuRow) setActionModal({ mode: 'add', row: menuRow }); else onAdd(); },
+    watch: (list: WatchlistKey) => { if (menuHolding) runMenuAction(async () => {
+      await readJson('/api/watchlist', undefined, { symbol: menuHolding.symbol, market: menuHolding.market, name: menuHolding.name,
+        sector: menuHolding.sector, list_key: list });
+      await watchlist.reload();
+    }); },
+    pick: () => { if (menuHolding) runMenuAction(async () => {
+      // 選定価格はAPI側で保存済みの現在値を採用する。
+      await readJson('/api/top-picks', undefined, { symbol: menuHolding.symbol, market: menuHolding.market });
+      await picks.reload();
+    }); },
+    refresh: () => { if (menuHolding) runMenuAction(async () => {
+      const result = await readJson<{ prices: Record<string, StockPrice> }>('/api/prices', undefined,
+        { symbols: [{ symbol: menuHolding.symbol, market: menuHolding.market, name: menuHolding.name }] });
+      if (!result.prices[`${menuHolding.symbol}|${menuHolding.market}`]) throw new Error('価格を取得できませんでした。時間をおいて再試行してください。');
+      window.location.reload();
+    }); },
+    copyCode: () => { if (menuHolding) runMenuAction(() => navigator.clipboard.writeText(menuHolding.symbol)); },
+    copyName: () => { if (menuRow) runMenuAction(() => navigator.clipboard.writeText(String(menuRow.values.name))); },
+    yahoo: () => { if (menuHolding) window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(toYahooSymbol(menuHolding.symbol, menuHolding.market))}`, '_blank', 'noopener,noreferrer'); },
+    remove: () => { if (menuRow) setDeleting(menuRow); },
+    csv: exportCsv,
+    columns: () => { if (columnSettings.current) { columnSettings.current.open = true; columnSettings.current.querySelector('summary')?.focus(); } },
+  };
+  const menuItems = buildHoldingMenuItems({ holding: menuHolding,
+    watchlist: watchlist.loading || watchlist.error ? undefined : watchlist.data?.watchlistItems,
+    picks: picks.loading || picks.error ? undefined : picks.data?.topPicks, actions });
   const subtotal = (label: string, members: Row<HoldingRow>[]) => {
     const summary = computeHoldingSubtotal(members.map((row) => row.original.holding), usdJpy, total);
     const values: Partial<Record<HoldingColumnId, [string, number?]>> = {
@@ -127,7 +185,7 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
       </div>
       <input type="search" aria-label="保有銘柄を絞り込み" placeholder="コード・銘柄名・メモで絞り込み" value={filter} onChange={(event) => setFilter(event.target.value)} className="h-7 min-w-20 flex-1 rounded border border-[var(--pm-input-border)] bg-[var(--pm-bg)] px-2" />
       <HoldingsAllocationPopover holdings={filtered.map((row) => row.holding)} usdJpy={usdJpy} />
-      <details className="relative shrink-0" onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.open = false; }}>
+      <details ref={columnSettings} className="relative shrink-0" onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.open = false; }}>
         <summary className="pm-button list-none">列 {visibleColumns.length}/18</summary>
         <div className="absolute right-0 top-8 z-30 grid max-h-[65vh] w-56 gap-1 overflow-auto rounded border border-[var(--pm-border)] bg-[var(--pm-panel)] p-3 shadow-xl">
           {table.getAllLeafColumns().map((column) => <label key={column.id} className="flex items-center gap-2 py-1"><input type="checkbox" checked={column.getIsVisible()} disabled={column.getIsVisible() && visibleColumns.length === 1} onChange={column.getToggleVisibilityHandler()} />{String(column.columnDef.header)}</label>)}
@@ -141,7 +199,9 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
     </div>
     {error && <p role="alert" className="text-[var(--pm-accent)]">{error}</p>}
     <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-1 min-[900px]:grid-cols-[minmax(0,1fr)_320px]">
-      <section aria-label="保有銘柄一覧" aria-busy={busy} className="min-h-0 min-w-0 self-stretch overflow-auto rounded border border-[var(--pm-border)] bg-[var(--pm-panel)] max-[899px]:max-h-[60vh]">
+      <section aria-label="保有銘柄一覧" aria-busy={busy} tabIndex={-1} onContextMenu={(event) => {
+        event.preventDefault(); openMenu(event.clientX, event.clientY, event.currentTarget);
+      }} className="min-h-0 min-w-0 self-stretch overflow-auto rounded border border-[var(--pm-border)] bg-[var(--pm-panel)] max-[899px]:max-h-[60vh]">
         <div role="table" aria-label="保有銘柄" className="w-full text-[12px]" style={{ minWidth: Math.max(table.getTotalSize(), 120) }}>
           <div role="row" className="sticky top-0 z-10 grid items-center border-b border-[var(--pm-border)] bg-[var(--pm-heading)] pm-muted" style={{ ...gridStyle, height: 26 }}>
             {table.getHeaderGroups()[0].headers.map((header) => {
@@ -158,8 +218,16 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
           </div>
           {Array.from(groups.entries()).map(([label, members]) => <div role="rowgroup" key={label}>
             {grouping !== 'none' && subtotal(label, members)}
-            {members.map((row) => <div key={row.id} role="row" tabIndex={0} aria-selected={selected?.holding.id === row.id} draggable={canReorder && displayRows.length > 1} onClick={() => setSelectedId(row.id)} onKeyDown={(event) => {
+            {members.map((row) => <div key={row.id} role="row" tabIndex={0} aria-selected={selected?.holding.id === row.id} draggable={canReorder && displayRows.length > 1} onClick={() => setSelectedId(row.id)} onContextMenu={(event) => {
+              event.preventDefault(); event.stopPropagation(); openMenu(event.clientX, event.clientY, event.currentTarget, row.original);
+            }} onKeyDown={(event) => {
               if (event.target !== event.currentTarget) return;
+              if ((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu') {
+                event.preventDefault();
+                const rect = event.currentTarget.getBoundingClientRect();
+                openMenu(rect.left + 16, rect.bottom, event.currentTarget, row.original);
+                return;
+              }
               if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedId(row.id); }
               if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault();
@@ -182,7 +250,16 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
           {subtotal('合計', displayRows)}
         </div>
       </section>
-      <HoldingDetailPane key={selected?.holding.id ?? 'empty'} row={selected} onEdit={() => { if (selected) onEdit(selected); }} onClosePosition={async () => { if (selected) await onClosePosition(selected); }} onSaveMemo={async (memo) => { if (selected) await onSaveMemo(selected, memo); }} />
+      <HoldingDetailPane key={selected?.holding.id ?? 'empty'} row={selected} topPicks={topPicks} onEdit={() => { if (selected) onEdit(selected); }} onClosePosition={async () => { if (selected) await onClosePosition(selected); }} onSaveMemo={async (memo) => { if (selected) await onSaveMemo(selected, memo); }} />
     </div>
+    {menu && <ContextMenu key={menu.key} items={menuItems} x={menu.x} y={menu.y} returnFocus={menu.target} onClose={() => setMenu(undefined)} />}
+    {actionModal && <HoldingActionModal mode={actionModal.mode} row={actionModal.row} onClose={() => setActionModal(undefined)} />}
+    {deleting && <DeleteHoldingDialog row={deleting} onClose={() => setDeleting(undefined)} onDelete={async () => {
+      const index = displayRows.findIndex((row) => row.id === deleting.holding.id);
+      const nextId = displayRows[index + 1]?.id ?? displayRows[index - 1]?.id;
+      await onClosePosition(deleting);
+      setSelectedId(nextId);
+      requestAnimationFrame(() => document.getElementById(`holding-${nextId}`)?.focus());
+    }} />}
   </>;
 }
