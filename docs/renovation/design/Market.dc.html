@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>マーケット — Portfolio Manager</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0f14}
+a{color:#7fb3ff;text-decoration:none}a:hover{color:#b3d1ff}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.mr{display:grid;grid-template-columns:minmax(90px,1fr) 88px 72px 64px 72px;align-items:center;height:24px;padding:0 8px;border-bottom:1px solid #1b222c}
+.mr>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mh{height:22px;background:#161c25;color:#9aa6b6;border-bottom:1px solid #232b36}
+.panel{background:#11161d;border:1px solid #232b36;border-radius:4px;min-width:0}
+.ph{display:flex;align-items:center;height:30px;padding:0 10px;border-bottom:1px solid #232b36}
+.ph h2{margin:0;font-size:12px;font-weight:600}
+.btn{height:24px;padding:0 9px;background:#1d2530;color:#c3ccd8;border:1px solid #2c3644;border-radius:3px;font:inherit;cursor:pointer}
+.btn.on{background:#2a2214;color:#f5b955;border-color:#6b5226}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column; background: #0b0f14; color: #d8dee7; font-family: Inter, 'Noto Sans JP', sans-serif; font-size: 12px; line-height: 1.4">
+<dc-import name="TopBar" hint-size="100%,40px"></dc-import>
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; min-height: 0">
+<div style="flex: 1 1 160px; max-width: 100%; display: flex">
+<dc-import name="SideNav" current="market" hint-size="168px,100%"></dc-import>
+</div>
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px">
+
+<div style="display: flex; flex-wrap: wrap; gap: 4px">
+<sc-for list="{{panels}}" as="p" hint-placeholder-count="4">
+<section class="panel" aria-label="{{p.title}}" style="flex: 1 1 300px">
+<div class="ph"><h2>{{p.title}}</h2></div>
+<div class="mr mh"><span>名称</span><span class="num">現在値</span><span class="num">前日比</span><span class="num">騰落率</span><span>5日</span></div>
+<sc-for list="{{p.rows}}" as="r" hint-placeholder-count="5">
+<div class="mr"><span>{{r.name}}</span><span class="num" style="font-weight: 600">{{r.val}}</span><span class="num" style="color: {{r.color}}">{{r.chg}}</span><span class="num" style="color: {{r.color}}">{{r.pct}}</span><span><svg viewBox="0 0 64 16" width="64" height="16" aria-hidden="true"><path d="{{r.spark}}" fill="none" stroke="{{r.color}}" stroke-width="1.2"></path></svg></span></div>
+</sc-for>
+</section>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+<section class="panel" aria-labelledby="m-sec" style="flex: 1 1 380px">
+<div class="ph"><h2 id="m-sec">米国セクター別騰落（セクターETF）</h2><span style="flex: 1"></span><div role="group" aria-label="期間" style="display: flex; gap: 2px"><button type="button" class="btn on">1日</button><button type="button" class="btn">1週</button><button type="button" class="btn">1か月</button><button type="button" class="btn">年初来</button></div></div>
+<div style="padding: 6px 10px; display: flex; flex-direction: column">
+<sc-for list="{{sectors}}" as="s" hint-placeholder-count="11">
+<div style="display: grid; grid-template-columns: 44px 108px minmax(0, 1fr) 60px; align-items: center; gap: 8px; height: 24px">
+<span style="color: #9aa6b6">{{s.etf}}</span><span>{{s.name}}</span>
+<div style="position: relative; height: 12px">
+<div style="position: absolute; left: 50%; top: -6px; bottom: -6px; width: 1px; background: #2c3644"></div>
+<div style="position: absolute; top: 0; height: 12px; border-radius: 2px; left: {{s.left}}; width: {{s.width}}; background: {{s.color}}"></div>
+</div>
+<span class="num" style="color: {{s.color}}">{{s.pct}}</span>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section class="panel" aria-labelledby="m-heat" style="flex: 2 1 520px; display: flex; flex-direction: column">
+<div class="ph"><h2 id="m-heat">ヒートマップ（保有＋登録銘柄・前日比）</h2><span style="flex: 1"></span><div role="group" aria-label="対象" style="display: flex; gap: 2px"><button type="button" class="btn on">保有＋登録</button><button type="button" class="btn">保有のみ</button></div></div>
+<div style="padding: 8px; display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{heat}}" as="g" hint-placeholder-count="5">
+<div>
+<div style="color: #9aa6b6; font-size: 11px; margin-bottom: 4px">{{g.name}}</div>
+<div style="display: flex; flex-wrap: wrap; gap: 3px">
+<sc-for list="{{g.tiles}}" as="t" hint-placeholder-count="4">
+<a href="Detail.dc.html" style="display: flex; flex-direction: column; justify-content: center; width: {{t.w}}; height: 52px; padding: 0 8px; box-sizing: border-box; border-radius: 3px; background: {{t.bg}}; color: #f3f6fa">
+<span style="font-weight: 600">{{t.code}}</span>
+<span class="num" style="text-align: left">{{t.pct}}</span>
+</a>
+</sc-for>
+</div>
+</div>
+</sc-for>
+<div style="display: flex; align-items: center; gap: 6px; color: #9aa6b6; font-size: 11px; margin-top: 4px">
+<span>-3%</span>
+<span style="display: flex; height: 8px; width: 180px; border-radius: 2px; overflow: hidden"><span style="flex: 1; background: {{legend.d3}}"></span><span style="flex: 1; background: {{legend.d1}}"></span><span style="flex: 1; background: #1d2530"></span><span style="flex: 1; background: {{legend.u1}}"></span><span style="flex: 1; background: {{legend.u3}}"></span></span>
+<span>+3%</span>
+<span style="margin-left: 12px">枠の幅＝保有は評価額、登録は一定</span>
+</div>
+</div>
+</section>
+</div>
+
+</main>
+</div>
+<dc-import name="Ticker" updown="{{updown}}" hint-size="100%,48px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"updown":{"editor":"enum","options":["日本式","米国式"],"default":"日本式","section":"表示"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const updown = this.props.updown ?? '日本式';
+    const jp = updown !== '米国式';
+    const c = jp ? { up: '#ff5c5c', down: '#4ea2ff', upRgb: '255,92,92', dnRgb: '78,162,255' } : { up: '#2fc677', down: '#ff5c5c', upRgb: '47,198,119', dnRgb: '255,92,92' };
+    const col = (n) => (n > 0 ? c.up : n < 0 ? c.down : '#9aa6b6');
+    const spark = (seed, trend) => {
+      const p = [];
+      for (let i = 0; i <= 16; i++) {
+        const y = 8 - trend * (i / 16) * 4 + Math.sin(i * 1.2 + seed) * 3 + Math.sin(i * 0.5 + seed * 2) * 1.5;
+        p.push((i === 0 ? 'M' : 'L') + (i * 4) + ' ' + Math.max(1, Math.min(15, y)).toFixed(1));
+      }
+      return p.join(' ');
+    };
+    const row = (r, i) => ({ name: r[0], val: r[1], chg: r[2], pct: (r[3] > 0 ? '+' : '') + r[3].toFixed(2) + '%', color: col(r[3]), spark: spark(i * 1.7 + r[0].length, r[3] > 0 ? 1 : -1) });
+    const panels = [
+      { title: '株価指数', rows: [['日経225', '48,350.12', '+412.55', 0.86], ['TOPIX', '3,215.40', '+18.22', 0.57], ['グロース250', '702.35', '-4.10', -0.58], ['NYダウ', '46,820.55', '-98.40', -0.21], ['S&P500', '6,712.30', '-21.45', -0.32], ['NASDAQ', '22,904.75', '-98.10', -0.43], ['SOX', '6,105.80', '-69.20', -1.12], ['ラッセル2000', '2,468.90', '+5.30', 0.22]].map(row) },
+      { title: '為替', rows: [['USD/JPY', '154.820', '+0.630', 0.41], ['EUR/JPY', '179.36', '+0.39', 0.22], ['EUR/USD', '1.1585', '-0.0021', -0.18], ['GBP/JPY', '206.42', '+0.57', 0.28], ['AUD/JPY', '100.85', '-0.12', -0.12]].map(row) },
+      { title: '金利', rows: [['米2年債', '3.482%', '-0.024', -0.68], ['米10年債', '4.112%', '-0.031', -0.75], ['米30年債', '4.705%', '-0.018', -0.38], ['日本10年債', '1.652%', '+0.012', 0.73]].map(row) },
+      { title: '商品・その他', rows: [['WTI原油', '61.48', '-0.58', -0.94], ['金', '4,105.6', '+15.5', 0.38], ['銅', '5.012', '+0.041', 0.83], ['VIX', '17.85', '+0.92', 5.43], ['ビットコイン', '108,250', '-1,420', -1.29]].map(row) }
+    ];
+    const SEC = [['XLK', '情報技術', -0.62], ['XLC', '通信サービス', -0.18], ['XLY', '一般消費財', 0.21], ['XLP', '生活必需品', 0.44], ['XLV', 'ヘルスケア', 0.73], ['XLF', '金融', 0.12], ['XLI', '資本財', 0.35], ['XLE', 'エネルギー', -1.05], ['XLB', '素材', 0.58], ['XLU', '公益', 0.91], ['XLRE', '不動産', 0.27]];
+    const maxAbs = 1.2;
+    const sectors = [...SEC].sort((a, b) => b[2] - a[2]).map((r) => {
+      const w = (Math.abs(r[2]) / maxAbs) * 50;
+      return { etf: r[0], name: r[1], pct: (r[2] > 0 ? '+' : '') + r[2].toFixed(2) + '%', color: col(r[2]), left: (r[2] >= 0 ? 50 : 50 - w).toFixed(1) + '%', width: w.toFixed(1) + '%' };
+    });
+    const bg = (pct) => {
+      const a = Math.min(1, Math.abs(pct) / 3) * 0.7 + 0.15;
+      return pct === 0 ? '#1d2530' : 'rgba(' + (pct > 0 ? c.upRgb : c.dnRgb) + ',' + a.toFixed(2) + ')';
+    };
+    const tile = (code, pct, w) => ({ code, pct: (pct > 0 ? '+' : '') + pct.toFixed(2) + '%', bg: bg(pct), w: w + 'px' });
+    const heat = [
+      { name: '情報技術', tiles: [tile('AAPL', -0.96, 229), tile('MSFT', 1.27, 154), tile('NVDA', 2.33, 88), tile('AVGO', 1.98, 80), tile('AMD', -1.70, 80), tile('TSM', 0.99, 80), tile('8035', 2.09, 80), tile('ASML', -0.82, 80), tile('6857', -2.05, 80)] },
+      { name: '通信サービス', tiles: [tile('GOOGL', 0.58, 80), tile('META', -0.76, 80)] },
+      { name: '一般消費財', tiles: [tile('6758', 2.17, 106), tile('7203', -1.72, 80), tile('AMZN', 0.42, 80), tile('9984', 3.91, 80)] },
+      { name: '金融', tiles: [tile('8306', 2.49, 80), tile('JPM', -0.36, 80), tile('8316', 1.50, 80)] },
+      { name: 'ヘルスケア・FX', tiles: [tile('LLY', 1.28, 80), tile('USDJPY', 0.41, 124)] }
+    ];
+    const legend = { d3: bg(-3), d1: bg(-1), u1: bg(1), u3: bg(3) };
+    return { updown, panels, sectors, heat, legend };
+  }
+}
+</script>
+</body>
+</html>

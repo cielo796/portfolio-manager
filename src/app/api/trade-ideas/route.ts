@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createTradeIdea, listTradeIdeas } from '@/lib/sqlite';
+import { createTradeIdea, listTradeIdeas } from '@/lib/db';
 import { Market } from '@/types';
 
 export const dynamic = 'force-dynamic';

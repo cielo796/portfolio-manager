@@ -7,6 +7,8 @@ import { Input, Select } from '@/components/ui/input';
 import { Database, Download, Plus, Trash2, Upload } from 'lucide-react';
 import { Market, TickerPreset } from '@/types';
 import { normalizeFxSymbol } from '@/lib/utils';
+import { SyncSettings } from '@/components/settings/sync-settings';
+import { DisplaySettingsSection } from '@/components/shell/display-settings';
 
 type TickerPresetsResponse = {
   tickerPresets?: TickerPreset[];
@@ -70,11 +72,11 @@ export default function SettingsPage() {
 
     const normalizedSymbol = normalizeInputSymbol(tickerSymbol, tickerMarket);
     if (!normalizedSymbol) {
-      alert('Symbol is required.');
+      alert('ティッカーを入力してください。');
       return;
     }
     if (tickerMarket === 'FX' && !isSupportedFxSymbol(normalizedSymbol)) {
-      alert('FX symbol must be a 6-letter pair with JPY or USD quote (e.g. USDJPY, EURUSD).');
+      alert('FXのティッカーはJPYまたはUSD建ての6文字の通貨ペアで入力してください（例: USDJPY、EURUSD）。');
       return;
     }
 
@@ -92,7 +94,7 @@ export default function SettingsPage() {
         }),
       });
       if (response.status === 409) {
-        alert('This ticker is already registered.');
+        alert('このティッカーはすでに登録されています。');
         return;
       }
       if (!response.ok) {
@@ -104,14 +106,14 @@ export default function SettingsPage() {
       setTickerSymbol('');
       setTickerName('');
     } catch {
-      alert('Failed to add ticker preset.');
+      alert('ティッカーを追加できませんでした。');
     } finally {
       setIsSubmittingTicker(false);
     }
   };
 
   const handleDeleteTickerPreset = async (id: string) => {
-    const confirmed = confirm('Remove this registered ticker?');
+    const confirmed = confirm('このティッカーを削除しますか？');
     if (!confirmed) return;
 
     try {
@@ -120,7 +122,7 @@ export default function SettingsPage() {
 
       setTickerPresets((prev) => prev.filter((item) => item.id !== id));
     } catch {
-      alert('Failed to remove ticker preset.');
+      alert('ティッカーを削除できませんでした。');
     }
   };
 
@@ -138,7 +140,7 @@ export default function SettingsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert('Failed to export backup.');
+      alert('バックアップを書き出せませんでした。');
     }
   };
 
@@ -160,72 +162,75 @@ export default function SettingsPage() {
         if (!response.ok) {
           throw new Error('failed_to_import');
         }
-        alert('Backup imported.');
+        alert('バックアップを読み込みました。');
         window.location.reload();
       } catch {
-        alert('Failed to import backup file.');
+        alert('バックアップを読み込めませんでした。');
       }
     };
     reader.readAsText(file);
   };
 
   const handleClearData = async () => {
-    if (!confirm('Delete all data? This cannot be undone.')) return;
+    if (!confirm('すべてのデータを削除しますか？この操作は元に戻せません。')) return;
     try {
       const response = await fetch('/api/backup', { method: 'DELETE' });
       if (!response.ok) throw new Error('failed_to_clear');
-      alert('All data has been cleared.');
+      alert('すべてのデータを削除しました。');
       window.location.reload();
     } catch {
-      alert('Failed to clear data.');
+      alert('データを削除できませんでした。');
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="p-2">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-100">Settings</h1>
-        <p className="text-sm text-slate-500 mt-1">Manage ticker presets, backup, and storage.</p>
+        <h1 className="text-2xl font-bold text-slate-100">設定</h1>
+        <p className="text-sm text-slate-500 mt-1">ティッカー、バックアップ、保存先の管理</p>
       </div>
+
+      <SyncSettings />
+      <DisplaySettingsSection />
 
       <Card className="mb-6">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Database className="w-5 h-5 text-blue-400" />
-            <CardTitle>Database</CardTitle>
+            <CardTitle>データベース</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-slate-400">
-          <p>Data is stored in a local SQLite database.</p>
+          <p>データはこのPCのSQLiteデータベースに保存されます。</p>
           <p className="text-xs text-slate-500">
-            DB file: <code>data/portfolio.db</code>
+            DBファイル: <code>data/portfolio.db</code>
           </p>
         </CardContent>
       </Card>
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Registered Tickers</CardTitle>
+          <CardTitle>登録ティッカー</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleAddTickerPreset} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Select
-                label="Market"
+                label="市場"
                 value={tickerMarket}
                 onChange={(e) => setTickerMarket(e.target.value as Market)}
                 options={marketOptions}
                 disabled={isSubmittingTicker}
               />
               <Input
-                label="Symbol"
+                label="ティッカー"
                 placeholder={tickerMarket === 'FX' ? 'USDJPY' : 'AAPL / 7203'}
                 value={tickerSymbol}
                 onChange={(e) => setTickerSymbol(e.target.value.toUpperCase())}
                 disabled={isSubmittingTicker}
               />
               <Input
-                label="Name (optional)"
+                label="名称（任意）"
                 placeholder="Apple / Toyota"
                 value={tickerName}
                 onChange={(e) => setTickerName(e.target.value)}
@@ -235,7 +240,7 @@ export default function SettingsPage() {
             <div className="flex justify-end">
               <Button type="submit" disabled={isSubmittingTicker}>
                 <Plus className="w-4 h-4" />
-                Add Ticker
+                ティッカーを追加
               </Button>
             </div>
           </form>
@@ -244,10 +249,10 @@ export default function SettingsPage() {
             <table className="w-full">
               <thead>
                 <tr className="text-left text-sm text-slate-400 border-b border-slate-700/50">
-                  <th className="py-2 font-medium">Symbol</th>
-                  <th className="py-2 font-medium">Market</th>
-                  <th className="py-2 font-medium">Name</th>
-                  <th className="py-2 text-right font-medium">Actions</th>
+                  <th className="py-2 font-medium">ティッカー</th>
+                  <th className="py-2 font-medium">市場</th>
+                  <th className="py-2 font-medium">名称</th>
+                  <th className="py-2 text-right font-medium">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
@@ -259,7 +264,7 @@ export default function SettingsPage() {
                     <td className="py-2 text-right">
                       <Button size="sm" variant="danger" onClick={() => handleDeleteTickerPreset(preset.id)}>
                         <Trash2 className="w-4 h-4" />
-                        Remove
+                        削除
                       </Button>
                     </td>
                   </tr>
@@ -269,36 +274,36 @@ export default function SettingsPage() {
           </div>
 
           {!isLoadingTickers && tickerPresets.length === 0 && (
-            <div className="text-sm text-slate-500">No registered tickers yet.</div>
+            <div className="text-sm text-slate-500">登録されたティッカーはありません。</div>
           )}
-          {isLoadingTickers && <div className="text-sm text-slate-500">Loading ticker presets...</div>}
+          {isLoadingTickers && <div className="text-sm text-slate-500">ティッカーを読み込み中…</div>}
         </CardContent>
       </Card>
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Backup</CardTitle>
+          <CardTitle>バックアップ</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <Button variant="secondary" onClick={handleExport}>
               <Download className="w-4 h-4" />
-              Export Backup
+              バックアップを書き出す
             </Button>
             <label className="cursor-pointer">
               <span className="inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 bg-slate-700 hover:bg-slate-600 text-slate-100 focus:ring-slate-500 px-4 py-2 text-sm gap-2">
                 <Upload className="w-4 h-4" />
-                Import Backup
+                バックアップを読み込む
               </span>
               <input type="file" accept=".json" onChange={handleImport} className="hidden" />
             </label>
           </div>
           <hr className="border-slate-700" />
           <div>
-            <p className="text-sm text-slate-400 mb-3">Delete all data and reset the app.</p>
+            <p className="text-sm text-slate-400 mb-3">すべてのデータを削除してアプリを初期化します。</p>
             <Button variant="danger" onClick={handleClearData}>
               <Trash2 className="w-4 h-4" />
-              Clear All Data
+              すべてのデータを削除
             </Button>
           </div>
         </CardContent>
@@ -306,7 +311,7 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Version</CardTitle>
+          <CardTitle>バージョン</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-sm text-slate-400 space-y-1">

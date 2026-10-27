@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createTickerPreset, listTickerPresets } from '@/lib/sqlite';
+import { createTickerPreset, listTickerPresets } from '@/lib/db';
 import { Market } from '@/types';
 
 export const dynamic = 'force-dynamic';

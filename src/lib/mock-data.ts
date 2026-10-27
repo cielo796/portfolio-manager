@@ -1,4 +1,5 @@
 import { Portfolio, Holding, StockPrice, NewsItem, ExchangeRate, Transaction } from '@/types';
+import { priceKey } from '@/lib/price-key';
 
 // モック：ポートフォリオ（口座）
 export const mockPortfolios: Portfolio[] = [
@@ -30,7 +31,8 @@ export const mockHoldings: Holding[] = [
     market: 'US',
     shares: 50,
     avg_cost: 98.50,
-    sector: 'Technology',
+    sort_order: 0,
+    sector: 'technology',
     created_at: '2024-01-15T00:00:00Z',
     updated_at: '2024-01-15T00:00:00Z',
   },
@@ -42,7 +44,8 @@ export const mockHoldings: Holding[] = [
     market: 'US',
     shares: 100,
     avg_cost: 175.00,
-    sector: 'Technology',
+    sort_order: 1,
+    sector: 'technology',
     created_at: '2024-02-01T00:00:00Z',
     updated_at: '2024-02-01T00:00:00Z',
   },
@@ -54,7 +57,8 @@ export const mockHoldings: Holding[] = [
     market: 'US',
     shares: 30,
     avg_cost: 380.00,
-    sector: 'Technology',
+    sort_order: 2,
+    sector: 'technology',
     created_at: '2024-03-01T00:00:00Z',
     updated_at: '2024-03-01T00:00:00Z',
   },
@@ -66,7 +70,8 @@ export const mockHoldings: Holding[] = [
     market: 'JP',
     shares: 300,
     avg_cost: 3000,
-    sector: 'Consumer',
+    sort_order: 3,
+    sector: 'consumer_discretionary',
     created_at: '2024-01-20T00:00:00Z',
     updated_at: '2024-01-20T00:00:00Z',
   },
@@ -78,7 +83,8 @@ export const mockHoldings: Holding[] = [
     market: 'JP',
     shares: 100,
     avg_cost: 12500,
-    sector: 'Technology',
+    sort_order: 4,
+    sector: 'consumer_discretionary',
     created_at: '2024-02-15T00:00:00Z',
     updated_at: '2024-02-15T00:00:00Z',
   },
@@ -90,7 +96,8 @@ export const mockHoldings: Holding[] = [
     market: 'JP',
     shares: 500,
     avg_cost: 1200,
-    sector: 'Finance',
+    sort_order: 5,
+    sector: 'financials',
     created_at: '2024-04-01T00:00:00Z',
     updated_at: '2024-04-01T00:00:00Z',
   },
@@ -102,7 +109,7 @@ export const mockHoldings: Holding[] = [
     market: 'FX',
     shares: 10000,
     avg_cost: 152.35,
-    sector: 'FX',
+    sort_order: 6,
     created_at: '2024-05-01T00:00:00Z',
     updated_at: '2024-05-01T00:00:00Z',
   },
@@ -110,7 +117,7 @@ export const mockHoldings: Holding[] = [
 
 // モック：株価データ
 export const mockStockPrices: Record<string, StockPrice> = {
-  'NVDA': {
+  [priceKey('NVDA', 'US')]: {
     symbol: 'NVDA',
     market: 'US',
     name: 'NVIDIA Corporation',
@@ -120,7 +127,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'USD',
     updated_at: new Date().toISOString(),
   },
-  'AAPL': {
+  [priceKey('AAPL', 'US')]: {
     symbol: 'AAPL',
     market: 'US',
     name: 'Apple Inc.',
@@ -130,7 +137,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'USD',
     updated_at: new Date().toISOString(),
   },
-  'MSFT': {
+  [priceKey('MSFT', 'US')]: {
     symbol: 'MSFT',
     market: 'US',
     name: 'Microsoft Corporation',
@@ -140,7 +147,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'USD',
     updated_at: new Date().toISOString(),
   },
-  '7203': {
+  [priceKey('7203', 'JP')]: {
     symbol: '7203',
     market: 'JP',
     name: 'トヨタ自動車',
@@ -150,7 +157,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'JPY',
     updated_at: new Date().toISOString(),
   },
-  '6758': {
+  [priceKey('6758', 'JP')]: {
     symbol: '6758',
     market: 'JP',
     name: 'ソニーグループ',
@@ -160,7 +167,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'JPY',
     updated_at: new Date().toISOString(),
   },
-  '8306': {
+  [priceKey('8306', 'JP')]: {
     symbol: '8306',
     market: 'JP',
     name: '三菱UFJフィナンシャル・グループ',
@@ -170,7 +177,7 @@ export const mockStockPrices: Record<string, StockPrice> = {
     currency: 'JPY',
     updated_at: new Date().toISOString(),
   },
-  'USDJPY': {
+  [priceKey('USDJPY', 'FX')]: {
     symbol: 'USDJPY',
     market: 'FX',
     name: 'USD/JPY',

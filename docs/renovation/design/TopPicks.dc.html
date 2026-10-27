@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>トップピック — Portfolio Manager</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0f14}
+a{color:#7fb3ff;text-decoration:none}a:hover{color:#b3d1ff}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.panel{background:#11161d;border:1px solid #232b36;border-radius:4px;min-width:0}
+.ph{display:flex;align-items:center;gap:8px;min-height:30px;padding:0 10px;border-bottom:1px solid #232b36}
+.ph h2{margin:0;font-size:12px;font-weight:600}
+.tbl{min-width:1080px}
+.tr{display:grid;grid-template-columns:18px 34px 56px minmax(110px,1.2fr) 60px minmax(110px,1fr) 58px 40px 74px 76px 76px 68px 64px 68px 62px 70px;align-items:center;border-bottom:1px solid #1b222c}
+.tr>div{padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.body{height:32px}
+.th{position:sticky;top:0;z-index:1;height:26px;background:#161c25;color:#9aa6b6;font-weight:500;border-bottom:1px solid #232b36}
+.rowbtn{all:unset;cursor:pointer;color:#d8dee7;font-weight:600}.rowbtn:hover{color:#b3d1ff;text-decoration:underline}
+.badge{display:inline-block;padding:0 6px;border-radius:3px;font-size:11px;line-height:16px;border:1px solid}
+.tab{height:30px;padding:0 14px;background:transparent;color:#9aa6b6;border:0;border-bottom:2px solid transparent;font:inherit;cursor:pointer}
+.tab.on{color:#f5b955;border-bottom-color:#f0a33a;font-weight:600}
+.btn{height:26px;padding:0 10px;background:#1d2530;color:#c3ccd8;border:1px solid #2c3644;border-radius:4px;font:inherit;cursor:pointer;white-space:nowrap}
+.pri{background:#f0a33a;color:#1a1205;border-color:#f0a33a;font-weight:600}
+.grip{color:#5d6876;cursor:grab}
+.sect{padding:8px 12px;border-bottom:1px solid #232b36}
+.sect h3{margin:0 0 4px;font-size:11px;font-weight:500;color:#9aa6b6}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column; background: #0b0f14; color: #d8dee7; font-family: Inter, 'Noto Sans JP', sans-serif; font-size: 12px; line-height: 1.4">
+<dc-import name="TopBar" hint-size="100%,40px"></dc-import>
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; min-height: 0">
+<div style="flex: 1 1 160px; max-width: 100%; display: flex">
+<dc-import name="SideNav" current="toppicks" hint-size="168px,100%"></dc-import>
+</div>
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px">
+
+<section aria-label="トップピックの成績" class="panel" style="display: flex; flex-wrap: wrap; align-items: stretch">
+<div style="flex: 0 1 220px; padding: 8px 12px; border-right: 1px solid #232b36; display: flex; flex-direction: column; justify-content: center">
+<h1 style="margin: 0; font-size: 15px; font-weight: 600">トップピック</h1>
+<div style="color: #9aa6b6">確信度の高い銘柄を最大10件に絞って順位を付け、選定後の成績を追う</div>
+</div>
+<div style="flex: 1 1 120px; padding: 8px 12px; border-right: 1px solid #232b36"><div style="color: #9aa6b6; font-size: 11px">ピック数</div><div class="num" style="text-align: left; font-size: 17px; font-weight: 600">{{sum.n}}<span style="font-size: 12px; color: #9aa6b6; font-weight: 400"> / 10</span></div></div>
+<div style="flex: 1 1 140px; padding: 8px 12px; border-right: 1px solid #232b36"><div style="color: #9aa6b6; font-size: 11px">選定来の平均騰落</div><div class="num" style="text-align: left; font-size: 17px; font-weight: 600; color: {{sum.avgColor}}">{{sum.avg}}</div></div>
+<div style="flex: 1 1 140px; padding: 8px 12px; border-right: 1px solid #232b36"><div style="color: #9aa6b6; font-size: 11px">S&amp;P500比（平均）</div><div class="num" style="text-align: left; font-size: 17px; font-weight: 600; color: {{sum.alphaColor}}">{{sum.alpha}}</div></div>
+<div style="flex: 1 1 120px; padding: 8px 12px; border-right: 1px solid #232b36"><div style="color: #9aa6b6; font-size: 11px">プラスの銘柄</div><div class="num" style="text-align: left; font-size: 17px; font-weight: 600">{{sum.win}}</div></div>
+<div style="flex: 1 1 140px; padding: 8px 12px"><div style="color: #9aa6b6; font-size: 11px">次の見直し</div><div class="num" style="text-align: left; font-size: 17px; font-weight: 600; color: #f5b955">10/28 水</div><div style="color: #9aa6b6; font-size: 11px">MSFT 決算</div></div>
+</section>
+
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 4px; min-height: 0">
+<section class="panel" aria-label="ピック一覧" style="flex: 999 1 640px; display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px; padding: 0 8px; border-bottom: 1px solid #232b36">
+<div role="tablist" aria-label="表示" style="display: flex"><button type="button" role="tab" aria-selected="true" class="tab on">現在のピック 6</button><button type="button" role="tab" aria-selected="false" class="tab">外したピック 3</button></div>
+<span style="flex: 1 1 0"></span>
+<span style="color: #9aa6b6; padding-bottom: 7px">順位はドラッグで変更</span>
+<button type="button" class="btn" style="margin-bottom: 3px">列</button>
+<button type="button" class="btn pri" style="margin-bottom: 3px">＋ ピックを追加</button>
+</div>
+<div style="overflow: auto">
+<div role="table" aria-label="トップピック" class="tbl">
+<div role="row" class="tr th">
+<div role="columnheader"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">並べ替え</span></div>
+<div role="columnheader">順位</div><div role="columnheader">コード</div><div role="columnheader">銘柄名</div><div role="columnheader">状態</div><div role="columnheader">テーマ</div><div role="columnheader">確信度</div><div role="columnheader">期間</div>
+<div role="columnheader" class="num">選定日</div><div role="columnheader" class="num">選定時</div><div role="columnheader" class="num">現在値</div><div role="columnheader" class="num">選定来</div><div role="columnheader" class="num">S&amp;P比</div><div role="columnheader" class="num">目標</div><div role="columnheader" class="num">目標まで</div><div role="columnheader" class="num">見直し</div>
+</div>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+<div role="row" class="tr body" style="{{r.rowStyle}}" aria-selected="{{r.sel}}">
+<div role="cell" class="grip" aria-hidden="true">⋮⋮</div>
+<div role="cell" class="num" style="text-align: left; font-size: 16px; font-weight: 600; color: {{r.rankColor}}">{{r.rank}}</div>
+<div role="cell" style="color: #9aa6b6">{{r.code}}</div>
+<div role="cell"><button type="button" class="rowbtn" onClick="{{r.pick}}">{{r.name}}</button></div>
+<div role="cell"><span class="badge" style="{{r.stateStyle}}">{{r.state}}</span></div>
+<div role="cell" style="color: #c3ccd8">{{r.theme}}</div>
+<div role="cell" aria-label="確信度 {{r.conv}}"><span style="color: #f5b955; letter-spacing: 1px">{{r.dots}}</span></div>
+<div role="cell" style="color: #9aa6b6">{{r.term}}</div>
+<div role="cell" class="num">{{r.date}}</div>
+<div role="cell" class="num">{{r.pickPx}}</div>
+<div role="cell" class="num" style="font-weight: 600">{{r.px}}</div>
+<div role="cell" class="num" style="color: {{r.sinceColor}}; font-weight: 600">{{r.since}}</div>
+<div role="cell" class="num" style="color: {{r.alphaColor}}">{{r.alpha}}</div>
+<div role="cell" class="num">{{r.tgt}}</div>
+<div role="cell" class="num" style="color: #c3ccd8">{{r.toTgt}}</div>
+<div role="cell" class="num">{{r.review}}</div>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="padding: 8px 10px; color: #9aa6b6; border-top: 1px solid #232b36; margin-top: auto">状態は保有銘柄・登録銘柄と自動で連動します。ピックから外すと「外したピック」に成績ごと残ります。</div>
+</section>
+
+<aside aria-label="選択中のピック" class="panel" style="flex: 1 1 340px; display: flex; flex-direction: column">
+<div style="padding: 10px 12px; border-bottom: 1px solid #232b36">
+<div style="display: flex; align-items: baseline; gap: 8px"><span class="num" style="font-size: 20px; font-weight: 600; color: #f5b955">#{{sel.rank}}</span><span style="color: #9aa6b6">{{sel.code}}</span><span style="font-size: 14px; font-weight: 600">{{sel.name}}</span></div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px"><span class="badge" style="{{sel.stateStyle}}">{{sel.state}}</span><span class="badge" style="color: #c3ccd8; border-color: #2c3644">{{sel.theme}}</span><span class="badge" style="color: #f5b955; border-color: #6b5226">確信度 {{sel.conv}}</span><span class="badge" style="color: #c3ccd8; border-color: #2c3644">{{sel.term}}</span></div>
+</div>
+<div style="padding: 8px 12px; border-bottom: 1px solid #232b36">
+<div style="display: flex; justify-content: space-between; color: #9aa6b6; font-size: 11px"><span>選定日 {{sel.date}} から</span><span class="num" style="color: {{sel.sinceColor}}; font-size: 12px; font-weight: 600">{{sel.since}}</span></div>
+<svg viewBox="0 0 300 110" width="100%" height="110" role="img" aria-label="選定日からの価格推移と目標価格" preserveAspectRatio="none">
+<line x1="0" x2="300" y1="{{sel.tgtY}}" y2="{{sel.tgtY}}" stroke="#2dd4bf" stroke-dasharray="4 3"></line>
+<line x1="0" x2="300" y1="{{sel.pickY}}" y2="{{sel.pickY}}" stroke="#f0a33a" stroke-dasharray="4 3"></line>
+<path d="{{sel.path}}" fill="none" stroke="#7fb3ff" stroke-width="1.5"></path>
+<circle cx="2" cy="{{sel.pickY}}" r="3" fill="#f0a33a"></circle>
+</svg>
+<div style="display: flex; gap: 14px; color: #9aa6b6; font-size: 11px"><span><span style="color: #f0a33a">┄</span> 選定時 {{sel.pickPx}}</span><span><span style="color: #2dd4bf">┄</span> 目標 {{sel.tgt}}（{{sel.toTgt}}）</span></div>
+</div>
+<div class="sect"><h3>選定理由</h3><p style="margin: 0; color: #c3ccd8; line-height: 1.6">[なぜトップピックにしたか。2〜3行で書く]</p></div>
+<div class="sect"><h3>カタリスト</h3>
+<ul style="margin: 0; padding-left: 16px; color: #c3ccd8; line-height: 1.7"><li>[次の決算や製品発表など、株価が動くきっかけ]</li><li>[2つ目のきっかけ]</li></ul></div>
+<div class="sect" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<div><h3>リスク</h3><p style="margin: 0; color: #c3ccd8">[想定する下振れ要因]</p></div>
+<div><h3>外す条件</h3><p style="margin: 0; color: #c3ccd8">[この条件で見直す・外す]</p></div>
+</div>
+<div class="sect" style="border-bottom: 0">
+<div style="display: flex; align-items: center"><h3 style="margin: 0">関連メモ</h3><span style="flex: 1"></span><a href="Memos.dc.html" style="font-size: 11px">すべて →</a></div>
+<ul style="list-style: none; margin: 4px 0 0; padding: 0">
+<li style="display: flex; gap: 8px; height: 24px; align-items: center; border-bottom: 1px solid #1b222c"><span class="num" style="color: #9aa6b6">10/22</span><a href="Memos.dc.html" style="color: #d8dee7; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Q3決算前の確認ポイント</a><span style="color: #9aa6b6">決算</span></li>
+<li style="display: flex; gap: 8px; height: 24px; align-items: center; border-bottom: 1px solid #1b222c"><span class="num" style="color: #9aa6b6">10/08</span><a href="Memos.dc.html" style="color: #d8dee7; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">買い増しの目安</a><span style="color: #9aa6b6">売買理由</span></li>
+<li style="display: flex; gap: 8px; height: 24px; align-items: center"><span class="num" style="color: #9aa6b6">03/02</span><a href="Memos.dc.html" style="color: #d8dee7; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">トップピックに選定</a><span style="color: #9aa6b6">アイデア</span></li>
+</ul>
+</div>
+<div style="display: flex; gap: 6px; padding: 8px 12px; margin-top: auto; border-top: 1px solid #232b36">
+<a href="Detail.dc.html" class="btn" style="display: flex; align-items: center; color: #c3ccd8">銘柄詳細</a>
+<a href="Memos.dc.html" class="btn" style="display: flex; align-items: center; color: #c3ccd8">メモを書く</a>
+<span style="flex: 1"></span>
+<button type="button" class="btn">ピックから外す</button>
+</div>
+</aside>
+</div>
+
+</main>
+</div>
+<dc-import name="Ticker" updown="{{updown}}" hint-size="100%,48px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"updown":{"editor":"enum","options":["日本式","米国式"],"default":"日本式","section":"表示"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { selected: 'NVDA' };
+  }
+  renderVals() {
+    const updown = this.props.updown ?? '日本式';
+    const c = updown === '米国式' ? { up: '#2fc677', down: '#ff5c5c' } : { up: '#ff5c5c', down: '#4ea2ff' };
+    const col = (n) => (n > 0 ? c.up : n < 0 ? c.down : '#9aa6b6');
+    const f = (n, d) => n.toLocaleString('ja-JP', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const s = (n, d) => (n > 0 ? '+' : '') + f(n, d);
+    const STATE = {
+      保有中: 'color: #f5b955; border-color: #6b5226',
+      登録: 'color: #7fb3ff; border-color: #34507a',
+      未登録: 'color: #9aa6b6; border-color: #2c3644'
+    };
+    const P = [
+      ['NVDA', 'NVIDIA', '保有中', 'AIデータセンター', '高', '長期', '03/02', 98.2, 142.5, 175, 14.2, '11/19', 'US'],
+      ['AVGO', 'Broadcom', '登録', 'AI向けASIC', '高', '中期', '05/12', 248.6, 352.1, 400, 9.8, '12/11', 'US'],
+      ['8035', '東京エレクトロン', '登録', '半導体製造装置', '中', '中期', '07/01', 26850, 31250, 34000, 4.1, '11/12', 'JP'],
+      ['LLY', 'Eli Lilly', '登録', '肥満症薬', '中', '長期', '04/15', 735.4, 812.5, 900, 11.0, '10/30', 'US'],
+      ['6758', 'ソニーグループ', '保有中', 'エンタメ・センサー', '中', '長期', '02/20', 12480, 13200, 15000, 15.6, '11/11', 'JP'],
+      ['MSFT', 'Microsoft', '保有中', 'クラウド・AI', '低', '長期', '01/15', 372, 415.8, 460, 16.9, '10/28', 'US']
+    ];
+    const DOTS = { 高: '●●●', 中: '●●○', 低: '●○○' };
+    const sel0 = P.find((p) => p[0] === this.state.selected) || P[0];
+    const fmt = (p, i) => {
+      const d = p[12] === 'JP' ? 0 : 2;
+      const pre = p[12] === 'JP' ? '¥' : '$';
+      const since = ((p[8] - p[7]) / p[7]) * 100;
+      const alpha = since - p[10];
+      return {
+        rank: String(i + 1), rankColor: i < 3 ? '#f5b955' : '#c3ccd8', code: p[0], name: p[1], state: p[2], stateStyle: STATE[p[2]],
+        theme: p[3], conv: p[4], dots: DOTS[p[4]], term: p[5], date: '2026/' + p[6],
+        pickPx: pre + f(p[7], d), px: pre + f(p[8], d), since: s(since, 1) + '%', sinceColor: col(since),
+        alpha: s(alpha, 1) + 'pt', alphaColor: col(alpha), tgt: pre + f(p[9], d), toTgt: s(((p[9] - p[8]) / p[8]) * 100, 1) + '%', review: p[11]
+      };
+    };
+    const rows = P.map((p, i) => ({
+      ...fmt(p, i),
+      sel: p[0] === sel0[0] ? 'true' : 'false',
+      rowStyle: p[0] === sel0[0] ? 'background: #1a2638' : '',
+      pick: () => this.setState({ selected: p[0] })
+    }));
+    const sinces = P.map((p) => ((p[8] - p[7]) / p[7]) * 100);
+    const avg = sinces.reduce((a, b) => a + b, 0) / sinces.length;
+    const alphaAvg = P.reduce((a, p, i) => a + sinces[i] - p[10], 0) / P.length;
+    const sum = { n: String(P.length), avg: s(avg, 1) + '%', avgColor: col(avg), alpha: s(alphaAvg, 1) + 'pt', alphaColor: col(alphaAvg), win: sinces.filter((v) => v > 0).length + ' / ' + P.length };
+    const idx = P.indexOf(sel0);
+    const lo = Math.min(sel0[7], sel0[8]) * 0.9;
+    const hi = Math.max(sel0[9], sel0[8]) * 1.04;
+    const Y = (v) => 105 - ((v - lo) / (hi - lo)) * 100;
+    const pts = [];
+    for (let i = 0; i <= 50; i++) {
+      const t = i / 50;
+      const base = sel0[7] + (sel0[8] - sel0[7]) * t;
+      const v = i === 50 ? sel0[8] : base * (1 + Math.sin(i * 0.6 + idx) * 0.03 * Math.sin(t * Math.PI) + Math.sin(i * 0.21 + idx) * 0.02 * Math.sin(t * Math.PI));
+      pts.push((i === 0 ? 'M' : 'L') + (t * 300).toFixed(1) + ' ' + Y(v).toFixed(1));
+    }
+    const sel = { ...fmt(sel0, idx), path: pts.join(' '), pickY: Y(sel0[7]).toFixed(1), tgtY: Y(sel0[9]).toFixed(1) };
+    return { updown, rows, sum, sel };
+  }
+}
+</script>
+</body>
+</html>

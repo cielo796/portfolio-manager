@@ -4,11 +4,30 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
+import { SECTORS } from '@/lib/sectors';
 import { Market, TickerPreset } from '@/types';
 import { normalizeFxSymbol } from '@/lib/utils';
 
 type PositionType = 'stock' | 'fx' | 'cash';
 const SUPPORTED_FX_QUOTES = ['JPY', 'USD'] as const;
+
+const defaultCashName = (market: Market) => (market === 'US' ? '米ドル現金' : '日本円現金');
+
+const isDefaultCashName = (name?: string) => {
+  const normalizedName = name?.trim();
+  return !normalizedName || normalizedName === defaultCashName('US') || normalizedName === defaultCashName('JP');
+};
+
+const parseNumericInput = (value: string): number => {
+  const normalized = value
+    .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+    .replace(/[，,]/g, '')
+    .replace(/．/g, '.')
+    .replace(/[^\d.-]/g, '')
+    .trim();
+
+  return normalized ? Number(normalized) : 0;
+};
 
 interface AddHoldingModalProps {
   isOpen: boolean;
@@ -29,20 +48,6 @@ export interface HoldingFormData {
   memo?: string;
 }
 
-const SECTORS = [
-  { value: '', label: 'セクターを選択' },
-  { value: 'Technology', label: 'テクノロジー' },
-  { value: 'Healthcare', label: 'ヘルスケア' },
-  { value: 'Finance', label: '金融' },
-  { value: 'Consumer', label: '一般消費財' },
-  { value: 'Energy', label: 'エネルギー' },
-  { value: 'Industrial', label: '資本財' },
-  { value: 'Materials', label: '素材' },
-  { value: 'Utilities', label: '公益事業' },
-  { value: 'Real Estate', label: '不動産' },
-  { value: 'Communication', label: '通信' },
-];
-
 export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
   isOpen,
   onClose,
@@ -52,6 +57,10 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
 }) => {
   const [positionType, setPositionType] = useState<PositionType>('stock');
   const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [cashAmountInput, setCashAmountInput] = useState('');
+  const [quantityInput, setQuantityInput] = useState('');
+  const [avgCostInput, setAvgCostInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<HoldingFormData>({
     portfolio_id: portfolios[0]?.id || '',
     symbol: '',
@@ -80,12 +89,14 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
       symbol: preset.symbol,
       market: preset.market,
       name: preset.name ?? prev.name,
-      sector: preset.market === 'FX' ? 'FX' : prev.sector,
+      sector: preset.market === 'FX' ? '' : prev.sector,
     }));
   };
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof HoldingFormData, string>> = {};
+    const shares = parseNumericInput(isCashPosition ? cashAmountInput : quantityInput);
+    const avgCost = parseNumericInput(avgCostInput);
     
     if (!isCashPosition && !formData.symbol.trim()) {
       newErrors.symbol = 'ティッカーシンボルを入力してください';
@@ -99,14 +110,14 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
         newErrors.symbol = '現在はJPY/USDクォートのFX通貨ペアのみ対応しています';
       }
     }
-    if (formData.shares <= 0) {
+    if (!Number.isFinite(shares) || shares <= 0) {
       newErrors.shares = isCashPosition
-        ? '金額は0より大きい値を入力してください'
+        ? '金額は0より大きい値を直接入力してください'
         : isFxPosition
         ? '取引数量は0より大きい値を入力してください'
         : '株数は1以上を入力してください';
     }
-    if (!isCashPosition && formData.avg_cost <= 0) {
+    if (!isCashPosition && (!Number.isFinite(avgCost) || avgCost <= 0)) {
       newErrors.avg_cost = isFxPosition
         ? '建値は0より大きい値を入力してください'
         : '取得単価は0より大きい値を入力してください';
@@ -119,27 +130,38 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
+      setIsSubmitting(true);
       try {
         const normalizedFxSymbol = normalizeFxSymbol(formData.symbol);
+        const cashMarket: Market = formData.market === 'US' ? 'US' : 'JP';
+        const cashAmount = parseNumericInput(cashAmountInput);
+        const quantity = parseNumericInput(quantityInput);
+        const avgCost = parseNumericInput(avgCostInput);
         const payload: HoldingFormData = isCashPosition
           ? {
               ...formData,
               symbol: 'CASH',
-              name: formData.market === 'US' ? '米ドル現金' : '日本円現金',
+              market: cashMarket,
+              shares: cashAmount,
+              name: formData.name?.trim() || defaultCashName(cashMarket),
               avg_cost: 1,
-              sector: 'Cash',
+              sector: undefined,
             }
           : isFxPosition
           ? {
               ...formData,
               market: 'FX',
               symbol: normalizedFxSymbol,
+              shares: quantity,
+              avg_cost: avgCost,
               name: `${normalizedFxSymbol.slice(0, 3)}/${normalizedFxSymbol.slice(3, 6)}`,
-              sector: 'FX',
+              sector: undefined,
             }
           : {
               ...formData,
               symbol: formData.symbol.toUpperCase().trim(),
+              shares: quantity,
+              avg_cost: avgCost,
             };
 
         await onSubmit({
@@ -149,6 +171,9 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
         onClose();
         setPositionType('stock');
         setSelectedPresetId('');
+        setCashAmountInput('');
+        setQuantityInput('');
+        setAvgCostInput('');
         // Reset form
         setFormData({
           portfolio_id: portfolios[0]?.id || '',
@@ -161,6 +186,8 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
         });
       } catch {
         // エラー表示は呼び出し側で実施
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -197,23 +224,31 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
               const nextType = e.target.value as PositionType;
               setSelectedPresetId('');
               setPositionType(nextType);
+              setQuantityInput('');
+              setAvgCostInput('');
               if (nextType === 'cash') {
+                setCashAmountInput('');
                 setFormData((prev) => ({
                   ...prev,
                   symbol: 'CASH',
                   market: 'JP',
+                  shares: 0,
+                  name: defaultCashName('JP'),
                   avg_cost: 1,
-                  sector: 'Cash',
+                  sector: undefined,
                 }));
                 return;
               }
               if (nextType === 'fx') {
+                setCashAmountInput('');
                 setFormData((prev) => ({
                   ...prev,
                   symbol: '',
                   market: 'FX',
+                  shares: 0,
+                  name: '',
                   avg_cost: 0,
-                  sector: 'FX',
+                  sector: undefined,
                 }));
                 return;
               }
@@ -222,6 +257,8 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
                 ...prev,
                 symbol: '',
                 market: 'US',
+                shares: 0,
+                name: '',
                 avg_cost: 0,
                 sector: '',
               }));
@@ -273,7 +310,14 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
               value={formData.market}
               onChange={(e) => {
                 setSelectedPresetId('');
-                setFormData({ ...formData, market: e.target.value as Market });
+                const nextMarket = e.target.value as Market;
+                setFormData((prev) => ({
+                  ...prev,
+                  market: nextMarket,
+                  name: isCashPosition && isDefaultCashName(prev.name)
+                    ? defaultCashName(nextMarket)
+                    : prev.name,
+                }));
               }}
               options={
                 isCashPosition
@@ -291,24 +335,55 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
             />
           </div>
 
-          <div className={`grid gap-4 ${isCashPosition ? 'grid-cols-1' : 'grid-cols-2'}`}>
+          {isCashPosition && (
             <Input
-              label={isCashPosition ? '金額' : isFxPosition ? '取引数量' : '株数'}
-              type="number"
-              min="1"
-              value={formData.shares || ''}
-              onChange={(e) => setFormData({ ...formData, shares: Number(e.target.value) })}
-              error={errors.shares}
+              label="表示名（任意）"
+              placeholder={defaultCashName(formData.market)}
+              value={formData.name || ''}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
+          )}
+
+          <div className={`grid gap-4 ${isCashPosition ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {isCashPosition ? (
+              <Input
+                key="cash-amount"
+                id="cash-amount"
+                label="金額"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="1,000,000"
+                value={cashAmountInput}
+                onChange={(e) => setCashAmountInput(e.currentTarget.value)}
+                error={errors.shares}
+              />
+            ) : (
+              <Input
+                key={`position-quantity-${positionType}`}
+                id="position-quantity"
+                label={isFxPosition ? '取引数量' : '株数'}
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder={isFxPosition ? '10,000' : '100'}
+                value={quantityInput}
+                onChange={(e) => setQuantityInput(e.currentTarget.value)}
+                error={errors.shares}
+              />
+            )}
 
             {!isCashPosition && (
               <Input
+                key={`position-avg-cost-${positionType}`}
+                id="position-avg-cost"
                 label={isFxPosition ? '建値' : '取得単価'}
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.avg_cost || ''}
-                onChange={(e) => setFormData({ ...formData, avg_cost: Number(e.target.value) })}
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder={isFxPosition ? '150.25' : '1,000.00'}
+                value={avgCostInput}
+                onChange={(e) => setAvgCostInput(e.currentTarget.value)}
                 error={errors.avg_cost}
               />
             )}
@@ -319,13 +394,16 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
               label="セクター"
               value={formData.sector || ''}
               onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
-              options={SECTORS}
+              options={[
+                { value: '', label: 'セクターを自動判定' },
+                ...SECTORS.map(({ key, label }) => ({ value: key, label })),
+              ]}
             />
           )}
 
           {isCashPosition && (
             <p className="text-xs text-slate-500">
-              現金ポジションは評価額と取得額を同額として管理します。
+              現金ポジションはティッカー登録なしで金額を直接入力できます。カンマ付きの貼り付けにも対応しています。
             </p>
           )}
           {isFxPosition && (
@@ -343,10 +421,10 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="secondary" onClick={onClose} className="flex-1">
+            <Button type="button" variant="secondary" onClick={onClose} className="flex-1" disabled={isSubmitting}>
               キャンセル
             </Button>
-            <Button type="submit" className="flex-1">
+            <Button type="submit" className="flex-1" disabled={isSubmitting}>
               追加
             </Button>
           </div>

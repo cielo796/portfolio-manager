@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>設定・LAN同期 — Portfolio Manager</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0f14}
+a{color:#7fb3ff;text-decoration:none}a:hover{color:#b3d1ff}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.panel{background:#11161d;border:1px solid #232b36;border-radius:4px;min-width:0}
+.ph{display:flex;align-items:center;gap:8px;min-height:30px;padding:0 10px;border-bottom:1px solid #232b36}
+.ph h2{margin:0;font-size:12px;font-weight:600}
+.kv{display:grid;grid-template-columns:140px minmax(0,1fr);align-items:center;gap:8px;min-height:28px;padding:0 10px;border-bottom:1px solid #1b222c}
+.kv>span:first-child{color:#9aa6b6}
+.inp{height:26px;box-sizing:border-box;padding:0 8px;background:#0b0f14;color:#d8dee7;border:1px solid #2c3644;border-radius:4px;font:inherit}
+.btn{height:26px;padding:0 10px;background:#1d2530;color:#c3ccd8;border:1px solid #2c3644;border-radius:4px;font:inherit;cursor:pointer;white-space:nowrap}
+.pri{background:#f0a33a;color:#1a1205;border-color:#f0a33a;font-weight:600}
+.sub{all:unset;box-sizing:border-box;display:flex;align-items:center;height:30px;padding:0 12px;border-radius:4px;color:#c3ccd8;cursor:pointer}
+.sub.on{background:#2a2214;color:#f5b955;font-weight:600}
+.pr{display:grid;grid-template-columns:minmax(120px,1.2fr) 150px 120px 110px minmax(150px,auto);align-items:center;gap:8px;min-height:34px;padding:0 10px;border-bottom:1px solid #1b222c}
+.lg{display:grid;grid-template-columns:96px 110px 48px 48px 48px 80px 60px minmax(0,1fr);align-items:center;gap:8px;height:24px;padding:0 10px;border-bottom:1px solid #1b222c}
+.lg>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hd{height:22px;background:#161c25;color:#9aa6b6}
+.dot{display:inline-block;width:7px;height:7px;border-radius:4px;margin-right:6px}
+.rad{display:flex;align-items:center;gap:6px;height:26px}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column; background: #0b0f14; color: #d8dee7; font-family: Inter, 'Noto Sans JP', sans-serif; font-size: 12px; line-height: 1.4">
+<dc-import name="TopBar" hint-size="100%,40px"></dc-import>
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; min-height: 0">
+<div style="flex: 1 1 160px; max-width: 100%; display: flex">
+<dc-import name="SideNav" current="settings" hint-size="168px,100%"></dc-import>
+</div>
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; align-content: flex-start">
+
+<nav aria-label="設定の項目" class="panel" style="flex: 1 1 160px; padding: 6px; display: flex; flex-direction: column; gap: 2px; align-self: stretch">
+<button type="button" class="sub on" aria-current="page">LAN同期・Link</button>
+<button type="button" class="sub">表示</button>
+<button type="button" class="sub">データ更新</button>
+<button type="button" class="sub">バックアップ</button>
+<button type="button" class="sub">ティッカー候補</button>
+<button type="button" class="sub">データ削除</button>
+</nav>
+
+<div style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+
+<div style="display: flex; flex-wrap: wrap; gap: 4px">
+<section class="panel" aria-labelledby="s-this" style="flex: 1 1 380px">
+<div class="ph"><h2 id="s-this">このPC</h2></div>
+<div class="kv"><label for="s-name">デバイス名</label><input id="s-name" class="inp" value="PC-A（リビング）" style="max-width: 260px"></div>
+<div class="kv"><span>デバイスID</span><span class="num" style="color: #c3ccd8">7f3a-91c2-0d4e</span></div>
+<div class="kv"><span>待ち受けアドレス</span><span class="num">192.168.1.23:38400</span></div>
+<div class="kv"><span>ファイアウォール</span><span><span class="dot" style="background: #2fc677"></span>許可済み（プライベートネットワークのみ）</span></div>
+<div class="kv" style="border-bottom: 0"><span>同期の受け付け</span><label style="display: flex; align-items: center; gap: 8px"><input type="checkbox" checked="{{true}}" style="accent-color: #f0a33a">Link済みのPCからの同期を受け付ける</label></div>
+</section>
+
+<section class="panel" aria-labelledby="s-link" style="flex: 1 1 380px; display: flex; flex-direction: column">
+<div class="ph"><h2 id="s-link">新しいPCとLink</h2></div>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; padding: 10px">
+<div style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px; padding-right: 12px; border-right: 1px solid #232b36">
+<div style="color: #9aa6b6">このPCで受け付ける</div>
+<sc-if value="{{pairing}}" hint-placeholder-val="{{true}}">
+<div class="num" style="font-size: 26px; font-weight: 600; letter-spacing: 4px; color: #f5b955">482 913</div>
+<div style="color: #9aa6b6">相手のPCで「192.168.1.23:38400」とこのコードを入力（残り 4:32）</div>
+<button type="button" class="btn" onClick="{{togglePairing}}" style="align-self: flex-start">受付を止める</button>
+</sc-if>
+<sc-if value="{{notPairing}}" hint-placeholder-val="{{false}}">
+<div style="color: #c3ccd8">受付を始めると、5分間有効な6桁のコードが表示されます。</div>
+<button type="button" class="btn pri" onClick="{{togglePairing}}" style="align-self: flex-start">Linkを受け付ける</button>
+</sc-if>
+</div>
+<form style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px">
+<div style="color: #9aa6b6">相手のPCに接続する</div>
+<label for="s-addr" style="color: #9aa6b6; font-size: 11px">相手のアドレス</label>
+<input id="s-addr" class="inp num" placeholder="192.168.1.41:38400">
+<label for="s-code" style="color: #9aa6b6; font-size: 11px">ペアリングコード</label>
+<input id="s-code" class="inp num" inputmode="numeric" placeholder="6桁">
+<button type="button" class="btn pri" style="align-self: flex-start">Linkする</button>
+</form>
+</div>
+</section>
+</div>
+
+<section class="panel" aria-labelledby="s-peers">
+<div class="ph"><h2 id="s-peers">Link済みのPC</h2><span style="flex: 1"></span><span style="color: #9aa6b6">同期は手動（ボタン操作）</span></div>
+<div class="pr hd" style="min-height: 22px"><span>デバイス</span><span>アドレス</span><span>最終同期</span><span>状態</span><span></span></div>
+<div class="pr">
+<span style="font-weight: 600">PC-B（書斎）</span><span class="num">192.168.1.41:38400</span><span class="num">10/22 21:12</span>
+<span><span class="dot" style="background: #2fc677"></span>接続可</span>
+<span style="display: flex; gap: 6px; justify-content: flex-end"><button type="button" class="btn pri">今すぐ同期</button><button type="button" class="btn">Link解除</button></span>
+</div>
+<div class="pr">
+<span style="font-weight: 600">ノートPC</span><span class="num">192.168.1.57:38400</span><span class="num">10/18 08:03</span>
+<span><span class="dot" style="background: #8a96a6"></span>応答なし</span>
+<span style="display: flex; gap: 6px; justify-content: flex-end"><button type="button" class="btn" disabled="{{true}}" style="opacity: 0.6">今すぐ同期</button><button type="button" class="btn">Link解除</button></span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; color: #c3ccd8">
+<span class="dot" style="background: #2fc677"></span>PC-Bとの時刻差 +0.8秒（許容範囲内）。同期の前に自動でバックアップを取ります（直近10世代）。
+</div>
+</section>
+
+<section class="panel" aria-labelledby="s-log" style="flex: 1 1 auto">
+<div class="ph"><h2 id="s-log">同期ログ</h2><span style="flex: 1"></span><button type="button" class="btn" style="height: 22px">バックアップから戻す</button></div>
+<div style="overflow-x: auto">
+<div style="min-width: 760px">
+<div class="lg hd"><span>日時</span><span>相手</span><span>受信</span><span>送信</span><span>競合</span><span>結果</span><span>所要</span><span>内容</span></div>
+<div class="lg"><span class="num">10/22 21:12</span><span>PC-B（書斎）</span><span class="num">12</span><span class="num">3</span><span class="num">1</span><span><span class="dot" style="background: #2fc677"></span>成功</span><span class="num">0.4秒</span><span style="color: #c3ccd8">登録銘柄 AVGO の目標価格：PC-Bの値（21:10更新）を採用</span></div>
+<div class="lg"><span class="num">10/21 22:40</span><span>PC-B（書斎）</span><span class="num">4</span><span class="num">9</span><span class="num">0</span><span><span class="dot" style="background: #2fc677"></span>成功</span><span class="num">0.3秒</span><span style="color: #9aa6b6">—</span></div>
+<div class="lg"><span class="num">10/18 08:03</span><span>ノートPC</span><span class="num">0</span><span class="num">27</span><span class="num">0</span><span><span class="dot" style="background: #2fc677"></span>成功</span><span class="num">0.6秒</span><span style="color: #9aa6b6">—</span></div>
+<div class="lg"><span class="num">10/17 23:15</span><span>ノートPC</span><span class="num">—</span><span class="num">—</span><span class="num">—</span><span><span class="dot" style="background: #ff8a5c"></span>失敗</span><span class="num">5.0秒</span><span style="color: #c3ccd8">相手に接続できません（タイムアウト）</span></div>
+</div>
+</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 4px">
+<section class="panel" aria-labelledby="s-view" style="flex: 1 1 300px">
+<div class="ph"><h2 id="s-view">表示</h2></div>
+<fieldset style="border: 0; margin: 0; padding: 6px 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px">
+<legend style="float: left; width: 96px; padding: 0; color: #9aa6b6">騰落色</legend>
+<label class="rad"><input type="radio" name="ud" checked="{{true}}" style="accent-color: #f0a33a">日本式（上昇<span style="color: #ff5c5c">赤</span>・下落<span style="color: #4ea2ff">青</span>）</label>
+<label class="rad"><input type="radio" name="ud" style="accent-color: #f0a33a">米国式（上昇<span style="color: #2fc677">緑</span>・下落<span style="color: #ff5c5c">赤</span>）</label>
+</fieldset>
+<fieldset style="border: 0; margin: 0; padding: 6px 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; border-top: 1px solid #1b222c">
+<legend style="float: left; width: 96px; padding: 0; color: #9aa6b6">行の高さ</legend>
+<label class="rad"><input type="radio" name="dn" checked="{{true}}" style="accent-color: #f0a33a">コンパクト（24px）</label>
+<label class="rad"><input type="radio" name="dn" style="accent-color: #f0a33a">標準（32px）</label>
+</fieldset>
+</section>
+<section class="panel" aria-labelledby="s-upd" style="flex: 1 1 300px">
+<div class="ph"><h2 id="s-upd">データ更新</h2></div>
+<div class="kv"><label for="s-int">自動更新</label><select id="s-int" class="inp" style="max-width: 260px"><option>市場が開いている間だけ5分ごと</option><option>1分ごと</option><option>手動のみ</option></select></div>
+<div class="kv" style="border-bottom: 0"><span>財務指標</span><span style="color: #c3ccd8">24時間キャッシュ・登録銘柄の更新時に取得</span></div>
+</section>
+</div>
+
+</div>
+</main>
+</div>
+<dc-import name="Ticker" updown="{{updown}}" hint-size="100%,48px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"updown":{"editor":"enum","options":["日本式","米国式"],"default":"日本式","section":"表示"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pairing: true };
+  }
+  renderVals() {
+    return {
+      updown: this.props.updown ?? '日本式',
+      pairing: this.state.pairing,
+      notPairing: !this.state.pairing,
+      togglePairing: () => this.setState({ pairing: !this.state.pairing })
+    };
+  }
+}
+</script>
+</body>
+</html>

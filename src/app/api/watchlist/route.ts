@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
-import { createWatchlistItem, listWatchlistItems } from '@/lib/sqlite';
-import { Market } from '@/types';
+import { createWatchlistItem, listWatchlistItems } from '@/lib/db';
+import { Market, WatchlistKey } from '@/types';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 type CreateWatchlistItemRequest = {
   symbol?: string;
+  name?: string;
   market?: Market;
+  list_key?: WatchlistKey;
+  sort_order?: number;
+  sector?: string;
   target_price?: number | string | null;
   memo?: string;
 };
 
 const isValidMarket = (market: unknown): market is Market =>
   market === 'US' || market === 'JP' || market === 'FX';
+const isValidWatchlistKey = (value: unknown): value is WatchlistKey =>
+  value === 'main' || value === 'sub1' || value === 'sub2' || value === 'sub3' || value === 'sub4';
 const normalizeFxSymbol = (symbol: string) => symbol.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6);
 const isSupportedFxSymbol = (symbol: string) => {
   const normalized = normalizeFxSymbol(symbol);
@@ -52,11 +58,24 @@ export async function POST(request: Request) {
   if (body.market === 'FX' && !isSupportedFxSymbol(body.symbol)) {
     return NextResponse.json({ error: 'FX symbols must be a 6-letter pair with JPY or USD quote.' }, { status: 400 });
   }
+  const name = body.name?.trim() || undefined;
+  if (body.market === 'JP' && !name) {
+    return NextResponse.json({ error: 'Japanese stocks require a company name.' }, { status: 400 });
+  }
 
   try {
     const watchlistItem = createWatchlistItem({
       symbol: body.symbol,
+      name,
       market: body.market,
+      list_key: isValidWatchlistKey(body.list_key) ? body.list_key : 'main',
+      sector: body.sector,
+      sort_order:
+        typeof body.sort_order === 'number' &&
+        Number.isInteger(body.sort_order) &&
+        body.sort_order >= 0
+          ? body.sort_order
+          : undefined,
       target_price: targetPrice,
       memo: body.memo,
     });

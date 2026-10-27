@@ -90,33 +90,16 @@ export const getMarketCurrency = (market: Market, symbol?: string): 'USD' | 'JPY
 
 // 損益の色クラス
 export const getProfitLossColor = (value: number): string => {
-  if (value > 0) return 'text-emerald-400';
-  if (value < 0) return 'text-red-400';
+  if (value > 0) return 'text-[var(--pm-up)]';
+  if (value < 0) return 'text-[var(--pm-down)]';
   return 'text-slate-400';
 };
 
 // 損益の背景色クラス
 export const getProfitLossBgColor = (value: number): string => {
-  if (value > 0) return 'bg-emerald-500/10';
-  if (value < 0) return 'bg-red-500/10';
+  if (value > 0) return 'bg-[color-mix(in_srgb,var(--pm-up)_10%,transparent)]';
+  if (value < 0) return 'bg-[color-mix(in_srgb,var(--pm-down)_10%,transparent)]';
   return 'bg-slate-500/10';
-};
-
-// セクター別の色
-export const SECTOR_COLORS: Record<string, string> = {
-  'Technology': '#3b82f6',
-  'Healthcare': '#10b981',
-  'Finance': '#f59e0b',
-  'Consumer': '#ec4899',
-  'Energy': '#ef4444',
-  'Industrial': '#8b5cf6',
-  'Materials': '#6366f1',
-  'Utilities': '#14b8a6',
-  'Real Estate': '#f97316',
-  'Communication': '#06b6d4',
-  'FX': '#22d3ee',
-  'Cash': '#22c55e',
-  'その他': '#64748b',
 };
 
 // ティッカーシンボルの正規化

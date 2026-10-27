@@ -2,9 +2,11 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
+import Link from 'next/link';
 import { HoldingWithPrice } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
+import { SECTORS, normalizeSectorKey } from '@/lib/sectors';
 import { formatCurrency, getMarketCurrency } from '@/lib/utils';
 
 interface EditHoldingModalProps {
@@ -22,21 +24,6 @@ export interface EditHoldingData {
   sector?: string;
   memo?: string;
 }
-
-const SECTORS = [
-  { value: '', label: 'セクターを選択' },
-  { value: 'Technology', label: 'テクノロジー' },
-  { value: 'Healthcare', label: 'ヘルスケア' },
-  { value: 'Finance', label: '金融' },
-  { value: 'Consumer', label: '一般消費財' },
-  { value: 'Energy', label: 'エネルギー' },
-  { value: 'Industrial', label: '資本財' },
-  { value: 'Materials', label: '素材' },
-  { value: 'Utilities', label: '公益事業' },
-  { value: 'Real Estate', label: '不動産' },
-  { value: 'Communication', label: '通信' },
-  { value: 'Cash', label: '現金' },
-];
 
 export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
   isOpen,
@@ -56,6 +43,7 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
   });
   const [errors, setErrors] = useState<Partial<Record<keyof EditHoldingData, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!holding || !isOpen) return;
@@ -63,10 +51,11 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
       name: holding.name || '',
       shares: holding.shares,
       avg_cost: isCash ? 1 : holding.avg_cost,
-      sector: holding.sector || (isCash ? 'Cash' : isFx ? 'FX' : ''),
+      sector: isCash || isFx ? '' : holding.sector ? normalizeSectorKey(holding.sector) : '',
       memo: holding.memo || '',
     });
     setErrors({});
+    setConfirmDelete(false);
   }, [holding, isCash, isFx, isOpen]);
 
   const currency = useMemo(() => {
@@ -99,7 +88,7 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
       await onSave(holding.id, {
         ...formData,
         avg_cost: isCash ? 1 : formData.avg_cost,
-        sector: isCash ? 'Cash' : isFx ? 'FX' : (formData.sector || undefined),
+        sector: isCash || isFx ? undefined : (formData.sector || ''),
         memo: formData.memo?.trim() || undefined,
         name: formData.name?.trim() || undefined,
       });
@@ -111,8 +100,7 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
 
   const handleClosePosition = async () => {
     if (!holding) return;
-    const confirmed = confirm(`「${holding.symbol}」を決済して保有一覧から削除します。よろしいですか？`);
-    if (!confirmed) return;
+    if (!confirmDelete) { setConfirmDelete(true); return; }
 
     setIsSubmitting(true);
     try {
@@ -179,7 +167,10 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
                   label="セクター"
                   value={formData.sector || ''}
                   onChange={(e) => setFormData((prev) => ({ ...prev, sector: e.target.value }))}
-                  options={SECTORS}
+                  options={[
+                    { value: '', label: 'セクターを自動判定' },
+                    ...SECTORS.map(({ key, label }) => ({ value: key, label })),
+                  ]}
                 />
               )}
             </>
@@ -198,9 +189,10 @@ export const EditHoldingModal: React.FC<EditHoldingModalProps> = ({
             onChange={(e) => setFormData((prev) => ({ ...prev, memo: e.target.value }))}
           />
 
+          {!isCash && <Link className="pm-button block text-center" href={`/records?holding=${encodeURIComponent(holding.id)}&type=sell`}>売却を記録</Link>}
           <div className="flex gap-2 pt-4">
             <Button type="button" variant="danger" onClick={handleClosePosition} disabled={isSubmitting} className="flex-1">
-              決済
+              {confirmDelete ? '再度押して削除' : '保有を削除（記録なし）'}
             </Button>
             <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting} className="flex-1">
               キャンセル

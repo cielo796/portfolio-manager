@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteTickerPresetById } from '@/lib/sqlite';
+import { deleteTickerPresetById } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

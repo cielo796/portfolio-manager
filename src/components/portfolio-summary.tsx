@@ -37,13 +37,18 @@ export const PortfolioSummaryCard: React.FC<PortfolioSummaryCardProps> = ({
             ({formatPercent(summary.total_profit_loss_percent)})
           </span>
         </div>
+        {summary.missing_price_count > 0 && (
+          <p className="text-xs text-slate-400 mt-2">
+            価格未取得 {summary.missing_price_count}銘柄（評価額は取得額で計算）
+          </p>
+        )}
       </div>
 
       {/* 日次損益 */}
-      <div className={`backdrop-blur-sm border rounded-xl p-5 ${getProfitLossBgColor(summary.daily_change)} ${summary.daily_change >= 0 ? 'border-emerald-500/20' : 'border-red-500/20'}`}>
+      <div className={`backdrop-blur-sm border rounded-xl p-5 ${getProfitLossBgColor(summary.daily_change)} ${summary.daily_change >= 0 ? 'border-[color-mix(in_srgb,var(--pm-up)_20%,transparent)]' : 'border-[color-mix(in_srgb,var(--pm-down)_20%,transparent)]'}`}>
         <div className="flex items-center gap-3 mb-3">
-          <div className={`p-2 rounded-lg ${summary.daily_change >= 0 ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
-            <DailyChangeIcon className={`w-5 h-5 ${summary.daily_change >= 0 ? 'text-emerald-400' : 'text-red-400'}`} />
+          <div className={`p-2 rounded-lg ${summary.daily_change >= 0 ? 'bg-[color-mix(in_srgb,var(--pm-up)_20%,transparent)]' : 'bg-[color-mix(in_srgb,var(--pm-down)_20%,transparent)]'}`}>
+            <DailyChangeIcon className={`w-5 h-5 ${summary.daily_change >= 0 ? 'text-[var(--pm-up)]' : 'text-[var(--pm-down)]'}`} />
           </div>
           <span className="text-sm text-slate-400">本日の損益</span>
         </div>
