@@ -35,6 +35,7 @@ interface AddHoldingModalProps {
   onSubmit: (data: HoldingFormData) => Promise<void> | void;
   portfolios: { id: string; name: string }[];
   tickerPresets: TickerPreset[];
+  initial?: Partial<HoldingFormData>;
 }
 
 export interface HoldingFormData {
@@ -54,8 +55,9 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
   onSubmit,
   portfolios,
   tickerPresets,
+  initial,
 }) => {
-  const [positionType, setPositionType] = useState<PositionType>('stock');
+  const [positionType, setPositionType] = useState<PositionType>(initial?.symbol === 'CASH' ? 'cash' : initial?.market === 'FX' ? 'fx' : 'stock');
   const [selectedPresetId, setSelectedPresetId] = useState('');
   const [cashAmountInput, setCashAmountInput] = useState('');
   const [quantityInput, setQuantityInput] = useState('');
@@ -69,6 +71,7 @@ export const AddHoldingModal: React.FC<AddHoldingModalProps> = ({
     avg_cost: 0,
     sector: '',
     memo: '',
+    ...initial,
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof HoldingFormData, string>>>({});

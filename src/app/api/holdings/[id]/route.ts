@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteHoldingById, updateHoldingById } from '@/lib/db';
+import { deleteHoldingById, getDb, listTransactions, updateHoldingById } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -63,7 +63,15 @@ export async function PATCH(request: Request, context: Context) {
 export async function DELETE(_request: Request, context: Context) {
   const { id } = await context.params;
 
-  const deleted = deleteHoldingById(id);
+  // 確認後に別の画面で記録が増えた場合も、連動する保有を削除しない。
+  const result = getDb().transaction(() => {
+    if (listTransactions().some((entry) => entry.holding_id === id && !entry.deleted_at)) return 'linked';
+    return deleteHoldingById(id) ? 'deleted' : 'missing';
+  }).immediate();
+  if (result === 'linked') {
+    return NextResponse.json({ error: '売買記録と連動しています。記録画面で記録を削除すると保有も再計算されます。' }, { status: 409 });
+  }
+  const deleted = result === 'deleted';
   if (!deleted) {
     return NextResponse.json({ error: '保有銘柄が見つかりません。' }, { status: 404 });
   }

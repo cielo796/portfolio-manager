@@ -1,7 +1,8 @@
 'use client';
 
 import { LatestMemos } from '@/components/memos/latest-memos';
-import { TopPickBadge, useTopPickRanks } from '@/components/top-picks/top-pick-badge';
+import { TopPickBadge } from '@/components/top-picks/top-pick-badge';
+import type { TopPickView } from '@/types';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -14,8 +15,9 @@ const DETAILS: [HoldingColumnId, string][] = [
   ['sector', 'セクター'], ['account', '口座'],
 ];
 
-export function HoldingDetailPane({ row, onEdit, onSaveMemo }: {
+export function HoldingDetailPane({ row, topPicks, onEdit, onSaveMemo }: {
   row: HoldingRow | undefined;
+  topPicks: TopPickView[];
   onEdit: () => void;
   onClosePosition: () => Promise<void>;
   onSaveMemo: (memo: string) => Promise<void>;
@@ -24,7 +26,6 @@ export function HoldingDetailPane({ row, onEdit, onSaveMemo }: {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const topPicks = useTopPickRanks();
   if (!row) return <aside aria-label="選択中の銘柄" className="rounded border border-[var(--pm-border)] bg-[var(--pm-panel)] p-3 pm-muted">表示中の銘柄を選択してください。</aside>;
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
