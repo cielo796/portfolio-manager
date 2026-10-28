@@ -2,11 +2,8 @@
 
 import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import type { StockPrice, TopPickView, TransactionType, WatchlistItem, WatchlistKey } from '@/types';
-import { detailHref, readJson, useDetailResource } from '@/components/detail/data';
+import { detailHref } from '@/components/detail/data';
 import { TopPickBadge } from '@/components/top-picks/top-pick-badge';
-import { ContextMenu } from '@/components/shell/context-menu';
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type Row, type SortingState } from '@tanstack/react-table';
 import { useColumnSettings } from '@/hooks/use-column-settings';
 import { computeHoldingSubtotal } from '@/lib/portfolio-calc';
@@ -15,9 +12,7 @@ import { createHoldingsCsv, holdingsCsvFilename } from './csv';
 import { HOLDING_COLUMNS, formatHoldingCell, holdingMarket, type HoldingColumnId, type HoldingRow } from './columns';
 import { HoldingDetailPane } from './detail-pane';
 import { HoldingsAllocationPopover } from './allocation-popover';
-import { buildHoldingMenuItems, toYahooSymbol, type HoldingMenuActions } from './context-menu-items';
-import { HoldingActionModal } from './action-modal';
-import { DeleteHoldingDialog } from './delete-dialog';
+import { useHoldingContextMenu } from './use-holding-context-menu';
 
 type Grouping = 'market' | 'sector' | 'account' | 'none';
 
@@ -40,16 +35,7 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
   const [draggedId, setDraggedId] = useState<string>();
   const [dropId, setDropId] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const router = useRouter();
   const columnSettings = useRef<HTMLDetailsElement>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number; row?: HoldingRow; target: HTMLElement; key: number }>();
-  const menuSequence = useRef(0);
-  const [actionModal, setActionModal] = useState<{ mode: 'add' | TransactionType; row: HoldingRow }>();
-  const [deleting, setDeleting] = useState<HoldingRow>();
-  const watchlist = useDetailResource<{ watchlistItems: WatchlistItem[] }>('/api/watchlist');
-  const picks = useDetailResource<{ topPicks: TopPickView[] }>('/api/top-picks');
-  const topPicks = picks.data?.topPicks ?? [];
   const { visibility, setVisibility, sizing, setSizing } = useColumnSettings();
   const filtered = useMemo(() => {
     const query = filter.trim().toLocaleLowerCase();
@@ -97,50 +83,17 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  const openMenu = (x: number, y: number, target: HTMLElement, row?: HoldingRow) => {
-    if (row) setSelectedId(row.holding.id);
-    target.focus({ preventScroll: true });
-    setMenu({ x, y, target, row, key: ++menuSequence.current });
-    void watchlist.reload(); void picks.reload();
-  };
-  const runMenuAction = (action: () => Promise<void>) => {
-    setError('');
-    void Promise.resolve().then(action).catch((cause) => setError(cause instanceof Error ? cause.message : '操作に失敗しました。'));
-  };
-  const menuRow = menu?.row;
-  const menuHolding = menuRow?.holding;
-  const actions: HoldingMenuActions = {
-    detail: () => { if (menuHolding) router.push(detailHref(menuHolding)); },
-    memo: () => { if (menuHolding) router.push(`/memos?symbol=${encodeURIComponent(menuHolding.symbol)}&market=${menuHolding.market}&new=1`); },
-    record: (mode) => { if (menuRow) setActionModal({ mode, row: menuRow }); },
-    edit: () => { if (menuRow) onEdit(menuRow); },
-    add: () => { if (menuRow) setActionModal({ mode: 'add', row: menuRow }); else onAdd(); },
-    watch: (list: WatchlistKey) => { if (menuHolding) runMenuAction(async () => {
-      await readJson('/api/watchlist', undefined, { symbol: menuHolding.symbol, market: menuHolding.market, name: menuHolding.name,
-        sector: menuHolding.sector, list_key: list });
-      await watchlist.reload();
-    }); },
-    pick: () => { if (menuHolding) runMenuAction(async () => {
-      // 選定価格はAPI側で保存済みの現在値を採用する。
-      await readJson('/api/top-picks', undefined, { symbol: menuHolding.symbol, market: menuHolding.market });
-      await picks.reload();
-    }); },
-    refresh: () => { if (menuHolding) runMenuAction(async () => {
-      const result = await readJson<{ prices: Record<string, StockPrice> }>('/api/prices', undefined,
-        { symbols: [{ symbol: menuHolding.symbol, market: menuHolding.market, name: menuHolding.name }] });
-      if (!result.prices[`${menuHolding.symbol}|${menuHolding.market}`]) throw new Error('価格を取得できませんでした。時間をおいて再試行してください。');
-      window.location.reload();
-    }); },
-    copyCode: () => { if (menuHolding) runMenuAction(() => navigator.clipboard.writeText(menuHolding.symbol)); },
-    copyName: () => { if (menuRow) runMenuAction(() => navigator.clipboard.writeText(String(menuRow.values.name))); },
-    yahoo: () => { if (menuHolding) window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(toYahooSymbol(menuHolding.symbol, menuHolding.market))}`, '_blank', 'noopener,noreferrer'); },
-    remove: () => { if (menuRow) setDeleting(menuRow); },
-    csv: exportCsv,
-    columns: () => { if (columnSettings.current) { columnSettings.current.open = true; columnSettings.current.querySelector('summary')?.focus(); } },
-  };
-  const menuItems = buildHoldingMenuItems({ holding: menuHolding,
-    watchlist: watchlist.loading || watchlist.error ? undefined : watchlist.data?.watchlistItems,
-    picks: picks.loading || picks.error ? undefined : picks.data?.topPicks, actions });
+  const menu = useHoldingContextMenu({ onAdd, onEdit, onSelect: (row) => setSelectedId(row.holding.id), onCsv: exportCsv,
+    onColumns: () => { if (columnSettings.current) { columnSettings.current.open = true; columnSettings.current.querySelector('summary')?.focus(); } },
+    onDelete: async (row) => {
+      const index = displayRows.findIndex((item) => item.id === row.holding.id);
+      const nextId = displayRows[index + 1]?.id ?? displayRows[index - 1]?.id;
+      await onClosePosition(row);
+      setSelectedId(nextId);
+      requestAnimationFrame(() => document.getElementById(`holding-${nextId}`)?.focus());
+    },
+  });
+  const { openMenu, topPicks, setError } = menu;
   const subtotal = (label: string, members: Row<HoldingRow>[]) => {
     const summary = computeHoldingSubtotal(members.map((row) => row.original.holding), usdJpy, total);
     const values: Partial<Record<HoldingColumnId, [string, number?]>> = {
@@ -197,7 +150,7 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
       <button type="button" className="pm-button !border-[var(--pm-accent)] !bg-[var(--pm-accent)] !text-[#1a1205]" onClick={onAdd}>＋ 保有を追加</button>
       <button type="button" className="pm-button" onClick={onRecord}>売買を記録</button>
     </div>
-    {error && <p role="alert" className="text-[var(--pm-accent)]">{error}</p>}
+    {menu.errorElement}
     <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-1 min-[900px]:grid-cols-[minmax(0,1fr)_320px]">
       <section aria-label="保有銘柄一覧" aria-busy={busy} tabIndex={-1} onContextMenu={(event) => {
         event.preventDefault(); openMenu(event.clientX, event.clientY, event.currentTarget);
@@ -252,14 +205,6 @@ export function HoldingsWorkspace({ rows, usdJpy, total, initialSelectedId, onAd
       </section>
       <HoldingDetailPane key={selected?.holding.id ?? 'empty'} row={selected} topPicks={topPicks} onEdit={() => { if (selected) onEdit(selected); }} onClosePosition={async () => { if (selected) await onClosePosition(selected); }} onSaveMemo={async (memo) => { if (selected) await onSaveMemo(selected, memo); }} />
     </div>
-    {menu && <ContextMenu key={menu.key} items={menuItems} x={menu.x} y={menu.y} returnFocus={menu.target} onClose={() => setMenu(undefined)} />}
-    {actionModal && <HoldingActionModal mode={actionModal.mode} row={actionModal.row} onClose={() => setActionModal(undefined)} />}
-    {deleting && <DeleteHoldingDialog row={deleting} onClose={() => setDeleting(undefined)} onDelete={async () => {
-      const index = displayRows.findIndex((row) => row.id === deleting.holding.id);
-      const nextId = displayRows[index + 1]?.id ?? displayRows[index - 1]?.id;
-      await onClosePosition(deleting);
-      setSelectedId(nextId);
-      requestAnimationFrame(() => document.getElementById(`holding-${nextId}`)?.focus());
-    }} />}
+    {menu.element}
   </>;
 }

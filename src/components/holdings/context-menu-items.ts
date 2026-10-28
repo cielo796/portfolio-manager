@@ -21,6 +21,7 @@ export type HoldingMenuActions = {
   remove: () => void;
   csv: () => void;
   columns: () => void;
+  portfolio?: () => void;
 };
 
 export function toYahooSymbol(symbol: string, market: Market): string {
@@ -33,10 +34,12 @@ export function toYahooSymbol(symbol: string, market: Market): string {
 export const hasLinkedTransactions = (holdingId: string, transactions: Pick<Transaction, 'holding_id' | 'deleted_at'>[]) =>
   transactions.some((entry) => entry.holding_id === holdingId && !entry.deleted_at);
 
-export function buildHoldingMenuItems({ holding, watchlist, picks, actions }: {
+export function buildHoldingMenuItems({ holding, watchlist, picks, actions, variant = 'workspace' }: {
   holding?: MenuHolding; watchlist?: WatchEntry[]; picks?: PickEntry[]; actions: HoldingMenuActions;
+  variant?: 'workspace' | 'home';
 }): ContextMenuItem[] {
   const add: ContextMenuItem = { id: 'add', label: '保有を追加…', onSelect: actions.add };
+  if (!holding && variant === 'home') return [add, { id: 'portfolio', label: '保有銘柄ページを開く', onSelect: actions.portfolio }];
   if (!holding) return [add, { id: 'csv', label: 'CSV出力', onSelect: actions.csv }, { id: 'columns', label: '列設定…', onSelect: actions.columns }];
   const edit: ContextMenuItem = { id: 'edit', label: '編集…', onSelect: actions.edit };
   const remove: ContextMenuItem = { id: 'remove', label: '削除…', danger: true, onSelect: actions.remove };

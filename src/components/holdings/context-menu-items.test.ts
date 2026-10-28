@@ -14,9 +14,9 @@ const entry = (items: ContextMenuItem[], id: string) => {
 const ids = (items: ContextMenuItem[]) => items.map((item) => item === 'separator' ? item : item.id);
 
 describe('保有の右クリックメニュー', () => {
-  it('株式の項目順と操作を既存機能へ接続する', () => {
+  it.each(['workspace', 'home'] as const)('株式の項目順と操作を既存機能へ接続する (%s)', (variant) => {
     const actions = makeActions();
-    const items = buildHoldingMenuItems({ holding: stock, watchlist: [], picks: [], actions });
+    const items = buildHoldingMenuItems({ holding: stock, watchlist: [], picks: [], actions, variant });
     expect(ids(items)).toEqual(['detail', 'memo', 'separator', 'record', 'edit', 'add', 'separator', 'watch', 'pick', 'refresh',
       'separator', 'copy-code', 'copy-name', 'yahoo', 'separator', 'remove']);
     expect(entry(items, 'detail').shortcut).toBe('Enter');
@@ -53,6 +53,27 @@ describe('保有の右クリックメニュー', () => {
     items.forEach((item) => { if (item !== 'separator') item.onSelect?.(); });
     for (const action of ['add', 'csv', 'columns'] as const) expect(actions[action]).toHaveBeenCalledOnce();
   });
+
+  it('ホームの空白部分は追加と保有銘柄ページへの移動だけを表示する', () => {
+    const actions = { ...makeActions(), portfolio: vi.fn() };
+    const items = buildHoldingMenuItems({ variant: 'home', actions });
+    expect(ids(items)).toEqual(['add', 'portfolio']);
+    expect(entry(items, 'add').label).toBe('保有を追加…');
+    expect(entry(items, 'portfolio').label).toBe('保有銘柄ページを開く');
+    entry(items, 'add').onSelect?.();
+    entry(items, 'portfolio').onSelect?.();
+    expect(actions.add).toHaveBeenCalledOnce();
+    expect(actions.portfolio).toHaveBeenCalledOnce();
+    expect(actions.csv).not.toHaveBeenCalled();
+    expect(actions.columns).not.toHaveBeenCalled();
+  });
+
+  it.each([stock, { ...stock, symbol: 'CASH' }, { ...stock, symbol: 'USDJPY', market: 'FX' as const }])(
+    'ホームの行ありメニューはworkspaceと同じ項目・状態を持つ ($symbol)', (holding) => {
+      const input = { holding, watchlist: [], picks: [], actions: makeActions() };
+      expect(JSON.stringify(buildHoldingMenuItems({ ...input, variant: 'home' }))).toBe(JSON.stringify(buildHoldingMenuItems(input)));
+    }
+  );
 
   it('登録は市場とリストを区別し、論理削除された登録を除外する', () => {
     const watchlist = [{ ...stock, list_key: 'main' as const }, { ...stock, market: 'JP' as const, list_key: 'sub1' as const },
